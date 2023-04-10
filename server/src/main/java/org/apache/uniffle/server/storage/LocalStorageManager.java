@@ -125,7 +125,7 @@ public class LocalStorageManager extends SingleStorageManager {
               .localStorageMedia(storageType)
               .build();
           successCount.incrementAndGet();
-        } catch (Exception e) {
+        } catch (Throwable e) {
           LOG.error("LocalStorage init failed!", e);
         } finally {
           countDownLatch.countDown();

@@ -53,6 +53,7 @@ import org.apache.hadoop.mapreduce.v2.app.rm.ContainerAllocatorEvent;
 import org.apache.hadoop.mapreduce.v2.app.rm.RMCommunicator;
 import org.apache.hadoop.mapreduce.v2.app.rm.RMContainerAllocator;
 import org.apache.hadoop.mapreduce.v2.app.rm.RMHeartbeatHandler;
+import org.apache.hadoop.mapreduce.v2.app.rm.preemption.NoopAMPreemptionPolicy;
 import org.apache.hadoop.mapreduce.v2.util.MRApps;
 import org.apache.hadoop.mapreduce.v2.util.MRWebAppUtil;
 import org.apache.hadoop.service.AbstractService;
@@ -402,7 +403,8 @@ public class RssMRAppMaster extends MRAppMaster {
             RssMRAppMaster.this.rssNmHttpPort,
             RssMRAppMaster.this.rssContainerID);
       } else {
-        this.containerAllocator = new RMContainerAllocator(this.clientService, this.context) {
+        this.containerAllocator = new RMContainerAllocator(this.clientService, this.context,
+            new NoopAMPreemptionPolicy()) {
           @Override
           protected AllocateResponse makeRemoteRequest() throws YarnException, IOException {
             AllocateResponse response = super.makeRemoteRequest();

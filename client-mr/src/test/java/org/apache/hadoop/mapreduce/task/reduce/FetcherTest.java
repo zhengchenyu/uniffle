@@ -86,7 +86,7 @@ public class FetcherTest {
   static LocalDirAllocator lda = new LocalDirAllocator(MRConfig.LOCAL_DIR);
 
   static TaskStatus taskStatus = new MockedTaskStatus();
-  static ShuffleClientMetrics metrics = new ShuffleClientMetrics(reduceId1, jobConf);
+  static ShuffleClientMetrics metrics = ShuffleClientMetrics.create(reduceId1, jobConf);
   static Reporter reporter = new MockedReporter();
   static FileSystem fs;
   static List<byte[]> data;

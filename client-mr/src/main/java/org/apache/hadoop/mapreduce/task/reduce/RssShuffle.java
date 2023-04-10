@@ -94,7 +94,7 @@ public class RssShuffle<K, V> implements ShuffleConsumerPlugin<K, V>, ExceptionR
 
     this.umbilical = context.getUmbilical();
     this.reporter = context.getReporter();
-    this.metrics = new ShuffleClientMetrics(reduceId, mrJobConf);
+    this.metrics = ShuffleClientMetrics.create(reduceId, mrJobConf);
     this.copyPhase = context.getCopyPhase();
     this.taskStatus = context.getStatus();
     this.reduceTask = context.getReduceTask();
