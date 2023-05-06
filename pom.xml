@@ -1611,6 +1611,9 @@
     </profile>
     <profile>
       <id>tez</id>
+      <properties>
+        <tez.version>0.9.2</tez.version>
+      </properties>
       <modules>
         <module>client-tez</module>
       </modules>
@@ -1622,6 +1625,10 @@
             <version>${project.version}</version>
             <type>test-jar</type>
             <scope>test</scope>
+          </dependency>
+          <dependency>
+            <groupId>org.apache.tez</groupId>
+            <artifactId>tez-api</artifactId>
           </dependency>
         </dependencies>
       </dependencyManagement>
