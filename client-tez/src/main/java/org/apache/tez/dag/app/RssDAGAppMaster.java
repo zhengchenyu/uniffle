@@ -2,7 +2,6 @@ package org.apache.tez.dag.app;
 
 import com.google.common.collect.Lists;
 import com.google.common.collect.Sets;
-import jdk.nashorn.internal.runtime.regexp.joni.Config;
 import org.apache.commons.cli.CommandLine;
 import org.apache.commons.cli.GnuParser;
 import org.apache.commons.cli.Options;
@@ -234,20 +233,21 @@ public class RssDAGAppMaster extends DAGAppMaster {
 
               Configuration edgeSourceConf = TezUtils.createConfFromUserPayload(edge.getEdgeProperty().getEdgeSource().getUserPayload());
               edgeSourceConf.set(RssTezConfig.RSS_ASSIGNMENT_PREFIX + sourceVertex.getVertexId().getId() + "." + partitionToServer.getKey(), StringUtils.join(servers, ","));
-              edgeSourceConf.setInt(RssTezConfig.RSS_ASSIGNMENT_PREFIX + "ouput.vertex.id", sourceVertex.getVertexId().getId());
+              edgeSourceConf.setInt(RssTezConfig.RSS_ASSIGNMENT_PREFIX + "output.vertex.id", sourceVertex.getVertexId().getId());
               edgeSourceConf.addResource(filteredExtraConf);
               edge.getEdgeProperty().getEdgeSource().setUserPayload(TezUtils.createUserPayloadFromConf(edgeSourceConf));
 
               Configuration edgeDestinationConf = TezUtils.createConfFromUserPayload(edge.getEdgeProperty().getEdgeSource().getUserPayload());
               edgeDestinationConf.set(RssTezConfig.RSS_ASSIGNMENT_PREFIX + sourceVertex.getVertexId().getId() + "." + partitionToServer.getKey(), StringUtils.join(servers, ","));
               edgeDestinationConf.setInt(RssTezConfig.RSS_ASSIGNMENT_PREFIX + "input.vertex.id", sourceVertex.getVertexId().getId());
-              edgeSourceConf.addResource(filteredExtraConf);
+              edgeDestinationConf.setInt(RssTezConfig.RSS_ASSIGNMENT_PREFIX + "number", finalPartitions);   // partition number
+              edgeDestinationConf.addResource(filteredExtraConf);
               edge.getEdgeProperty().getEdgeDestination().setUserPayload(TezUtils.createUserPayloadFromConf(edgeDestinationConf));
             } catch (IOException e) {
               throw new RssException(e);
             }
 //            sourceVertex.getConf().set(RssTezConfig.RSS_ASSIGNMENT_PREFIX + sourceVertex.getVertexId().getId() + "." + partitionToServer.getKey(), StringUtils.join(servers, ","));
-//            sourceVertex.getConf().setInt(RssTezConfig.RSS_ASSIGNMENT_PREFIX + "ouput.vertex.id", sourceVertex.getVertexId().getId());
+//            sourceVertex.getConf().setInt(RssTezConfig.RSS_ASSIGNMENT_PREFIX + "output.vertex.id", sourceVertex.getVertexId().getId());
 //            destinationVertex.getConf().set(RssTezConfig.RSS_ASSIGNMENT_PREFIX + sourceVertex.getVertexId().getId() + "." + partitionToServer.getKey(), StringUtils.join(servers, ","));
 //            destinationVertex.getConf().setInt(RssTezConfig.RSS_ASSIGNMENT_PREFIX + "input.vertex.id", sourceVertex.getVertexId().getId());
           });

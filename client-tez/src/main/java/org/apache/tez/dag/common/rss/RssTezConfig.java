@@ -136,6 +136,23 @@ public class RssTezConfig {
     TEZ_RSS_CONFIG_PREFIX + "rss.client.memory.threshold";
   public static final double RSS_CLIENT_DEFAULT_MEMORY_THRESHOLD = 0.8f;
 
+  public static final String RSS_CLIENT_READ_BUFFER_SIZE =
+    TEZ_RSS_CONFIG_PREFIX + RssClientConfig.RSS_CLIENT_READ_BUFFER_SIZE;
+
+  // When the size of read buffer reaches the half of JVM region (i.e., 32m),
+  // it will incur humongous allocation, so we set it to 14m.
+  public static final String RSS_CLIENT_READ_BUFFER_SIZE_DEFAULT_VALUE =
+    RssClientConfig.RSS_CLIENT_READ_BUFFER_SIZE_DEFAULT_VALUE;
+
+  public static final String RSS_INDEX_READ_LIMIT =
+    TEZ_RSS_CONFIG_PREFIX + RssClientConfig.RSS_INDEX_READ_LIMIT;
+  public static final int RSS_INDEX_READ_LIMIT_DEFAULT_VALUE =
+    RssClientConfig.RSS_INDEX_READ_LIMIT_DEFAULT_VALUE;
+
+  public static final String RSS_PARTITION_NUM_PER_RANGE =
+    TEZ_RSS_CONFIG_PREFIX + RssClientConfig.RSS_PARTITION_NUM_PER_RANGE;
+  public static final int RSS_PARTITION_NUM_PER_RANGE_DEFAULT_VALUE =
+    RssClientConfig.RSS_PARTITION_NUM_PER_RANGE_DEFAULT_VALUE;
 
   public static RssConf toRssConf(Configuration tezConf) {
     RssConf rssConf = new RssConf();

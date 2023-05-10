@@ -66,9 +66,8 @@
             <artifactId>grpc-protobuf</artifactId>
         </dependency>
         <dependency>
-            <groupId>com.google.protobuf</groupId>
-            <artifactId>protobuf-java</artifactId>
-            <version>${protobuf.version}</version>
+            <groupId>org.roaringbitmap</groupId>
+            <artifactId>RoaringBitmap</artifactId>
         </dependency>
         <dependency>
             <groupId>org.mockito</groupId>
@@ -90,9 +89,25 @@
             <version>${tez.version}</version>
         </dependency>
         <dependency>
+            <groupId>org.apache.tez</groupId>
+            <artifactId>tez-runtime-library</artifactId>
+            <version>${tez.version}</version>
+        </dependency>
+        <dependency>
             <groupId>org.apache.uniffle</groupId>
             <artifactId>rss-client-mr</artifactId>
             <version>0.8.0-SNAPSHOT</version>
+            <scope>compile</scope>
+        </dependency>
+        <dependency>
+            <groupId>org.apache.hadoop</groupId>
+            <artifactId>hadoop-mapreduce-client-core</artifactId>
+            <version>${hadoop.version}</version>
+        </dependency>
+        <dependency>
+            <groupId>org.slf4j</groupId>
+            <artifactId>jcl-over-slf4j</artifactId>
+            <version>2.0.0-alpha1</version>
             <scope>compile</scope>
         </dependency>
     </dependencies>
@@ -104,7 +119,7 @@
                 <artifactId>maven-shade-plugin</artifactId>
                 <executions>
                     <execution>
-                        <id>rss-client-mr-jar</id>
+                        <id>rss-client-tez-jar</id>
                         <phase>package</phase>
                         <goals>
                             <goal>shade</goal>
@@ -153,6 +168,7 @@
                                 </filter>
                             </filters>
                             <relocations>
+                                <!-- 如何解决多protobuf版本的问题-->
                                 <relocation>
                                     <pattern>com.google.protobuf</pattern>
                                     <shadedPattern>${rss.shade.packageName}.com.google.protobuf</shadedPattern>

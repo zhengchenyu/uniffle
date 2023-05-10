@@ -1,7 +1,8 @@
-package org.apache.tez.runtime.library.common.writers;
+package org.apache.tez.runtime.library.common.writers.rss;
 
 import com.google.common.collect.Lists;
 import com.google.common.collect.Maps;
+import com.google.protobuf.ByteString;
 import org.apache.commons.lang3.StringUtils;
 import org.apache.hadoop.conf.Configuration;
 import org.apache.hadoop.fs.CommonConfigurationKeys;
@@ -10,11 +11,15 @@ import org.apache.hadoop.io.serializer.Serializer;
 import org.apache.hadoop.util.IndexedSorter;
 import org.apache.hadoop.util.QuickSort;
 import org.apache.hadoop.util.ReflectionUtils;
+import org.apache.tez.common.TezCommonUtils;
+import org.apache.tez.common.TezUtilsInternal;
+import org.apache.tez.dag.api.TezConfiguration;
 import org.apache.tez.dag.common.rss.RssTezConfig;
 import org.apache.tez.dag.common.rss.RssTezUtils;
-import org.apache.tez.rss.WriteBufferManager;
 import org.apache.tez.runtime.api.Event;
 import org.apache.tez.runtime.api.OutputContext;
+import org.apache.tez.runtime.api.events.CompositeDataMovementEvent;
+import org.apache.tez.runtime.api.events.VertexManagerEvent;
 import org.apache.tez.runtime.library.api.KeyValuesWriter;
 import org.apache.tez.runtime.library.api.Partitioner;
 import org.apache.tez.runtime.library.api.TezRuntimeConfiguration;
@@ -22,20 +27,27 @@ import org.apache.tez.runtime.library.api.TezRuntimeConfiguration.ReportPartitio
 import org.apache.tez.runtime.library.common.ConfigUtils;
 import org.apache.tez.runtime.library.common.TezRuntimeUtils;
 import org.apache.tez.runtime.library.common.combine.Combiner;
+import org.apache.tez.runtime.library.common.shuffle.ShuffleUtils;
+import org.apache.tez.runtime.library.shuffle.impl.ShuffleUserPayloads;
 import org.apache.uniffle.common.ShuffleServerInfo;
 import org.apache.uniffle.common.exception.RssException;
+import org.roaringbitmap.RoaringBitmap;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 import java.io.IOException;
+import java.nio.ByteBuffer;
+import java.util.BitSet;
 import java.util.Iterator;
 import java.util.List;
 import java.util.Map;
+import java.util.zip.Deflater;
 
 public class RssBaseOrderedPartitionedWriter extends KeyValuesWriter {
 
   private static final Logger LOG = LoggerFactory.getLogger(RssBaseOrderedPartitionedWriter.class);
 
+  public static final String TEZ_AM_SHUFFLE_AUXILIARY_SERVICE_ID_UNIFFLE_RSS = "uniffle_rss_shuffle";
 
   protected final OutputContext outputContext;
   protected final Configuration conf;
@@ -58,6 +70,13 @@ public class RssBaseOrderedPartitionedWriter extends KeyValuesWriter {
   // Rss write buffer manager
   private WriteBufferManager bufferManager;
 
+  // TODO: 考虑是否有必要? 对于本地shuffle, finalMergeEnabled如果开启的话，会将所有spill的文件在本地合并成一个文件。如果不开启，不合并文件，shuffle在读的时候需要提供spillid的信息来决定读那些问文件。
+  // 显然对于rss, finalMergeEnabled是不需要的。但是shuffle server端的多次spill是如何进行合并的呢?????
+//  protected final boolean finalMergeEnabled;
+  private boolean sendEmptyPartitionDetails;
+  private final Deflater deflater;
+
+  private long taskAttemptId;
 
   // TODO: Add counter
   // ...
@@ -95,14 +114,40 @@ public class RssBaseOrderedPartitionedWriter extends KeyValuesWriter {
 
     Map<Integer, List<ShuffleServerInfo>> partitionToServers = createAssignmentMap(this.conf);
 
-    this.bufferManager = new WriteBufferManager(this.outputContext, this.conf, true, partitionToServers);
+    // 这里的taskAttemptId需要与fetchAllRssTaskIds的对应。因此需要是一个全局唯一的, 每个taskattempt对应一个全局唯一的taskattemptid。
+    // getTaskVertexIndex是vertexid, getTaskIndex是taskid, getTaskAttemptNumber是task的attemptid
+    this.taskAttemptId = RssTezUtils.convertTaskAttemptIdToLong(
+      this.outputContext.getTaskVertexIndex(), this.outputContext.getTaskIndex(), this.outputContext.getTaskAttemptNumber());
+    this.bufferManager = new WriteBufferManager(this.outputContext, this.conf, true, numPartitions, taskAttemptId, partitionToServers);
+
+//    this.finalMergeEnabled = conf.getBoolean(
+//      TezRuntimeConfiguration.TEZ_RUNTIME_ENABLE_FINAL_MERGE_IN_OUTPUT,
+//      TezRuntimeConfiguration.TEZ_RUNTIME_ENABLE_FINAL_MERGE_IN_OUTPUT_DEFAULT);
+//    boolean pipelinedShuffle = this.conf.getBoolean(TezRuntimeConfiguration
+//      .TEZ_RUNTIME_PIPELINED_SHUFFLE_ENABLED, TezRuntimeConfiguration
+//      .TEZ_RUNTIME_PIPELINED_SHUFFLE_ENABLED_DEFAULT);
+//    if (pipelinedShuffle) {
+//      throw new IOException("pipelinedShuffle is not supportted.");
+//    }
+
+    String auxiliaryService = conf.get(TezConfiguration.TEZ_AM_SHUFFLE_AUXILIARY_SERVICE_ID,
+      TEZ_AM_SHUFFLE_AUXILIARY_SERVICE_ID_UNIFFLE_RSS);
+    if (!auxiliaryService.equals(TEZ_AM_SHUFFLE_AUXILIARY_SERVICE_ID_UNIFFLE_RSS)) {
+      throw new IOException("Only " + TEZ_AM_SHUFFLE_AUXILIARY_SERVICE_ID_UNIFFLE_RSS + " is supportted.");
+    }
+
+    this.sendEmptyPartitionDetails = conf.getBoolean(
+      TezRuntimeConfiguration.TEZ_RUNTIME_EMPTY_PARTITION_INFO_VIA_EVENTS_ENABLED,
+      TezRuntimeConfiguration.TEZ_RUNTIME_EMPTY_PARTITION_INFO_VIA_EVENTS_ENABLED_DEFAULT);
+
+    deflater = TezCommonUtils.newBestCompressionDeflater();
   }
 
   private Map<Integer, List<ShuffleServerInfo>> createAssignmentMap(Configuration conf) {
     Map<Integer, List<ShuffleServerInfo>> partitionToServers = Maps.newHashMap();
 //    String edgeId = this.outputContext.getDestinationVertexName();
-    // sourceVertex.getConf().setInt(RssTezConfig.RSS_ASSIGNMENT_PREFIX + "ouput.vertex.id", sourceVertex.getVertexId().getId());
-    int vertexId = this.conf.getInt(RssTezConfig.RSS_ASSIGNMENT_PREFIX + "ouput.vertex.id", -1);
+    // sourceVertex.getConf().setInt(RssTezConfig.RSS_ASSIGNMENT_PREFIX + "output.vertex.id", sourceVertex.getVertexId().getId());
+    int vertexId = this.conf.getInt(RssTezConfig.RSS_ASSIGNMENT_PREFIX + "output.vertex.id", -1);
     assert vertexId != -1;
     assert vertexId == this.outputContext.getTaskVertexIndex();     // TODO: Remove it! Only for debug.
     for (int i = 0; i < this.numPartitions; i++) {
@@ -127,27 +172,78 @@ public class RssBaseOrderedPartitionedWriter extends KeyValuesWriter {
   }
 
   @Override
-  public List<Event> close() throws IOException, InterruptedException {
+  public List<Event> close() throws IOException {
     // TODO: report progress
     // reporter.progress();
     bufferManager.freeAllResources();
     return generateEvents();
   }
 
-
   private List<Event> generateEvents() throws IOException {
-    List<Event> eventList = Lists.newLinkedList();      // LogicalIOProcessorRuntimeTask.close的时候回生成事件DME事件
-//    if (finalMergeEnabled && !pipelinedShuffle) {
-//      boolean isLastEvent = true;
-//      String auxiliaryService = conf.get(TezConfiguration.TEZ_AM_SHUFFLE_AUXILIARY_SERVICE_ID,
-//        TezConfiguration.TEZ_AM_SHUFFLE_AUXILIARY_SERVICE_ID_DEFAULT);
-//      ShuffleUtils.generateEventOnSpill(eventList, finalMergeEnabled, isLastEvent,
-//        outputContext, 0, new TezSpillRecord(this.getFinalIndexFile(), conf),
-//        partitions, sendEmptyPartitionDetails, outputContext.getUniqueIdentifier(),
-//        this.getPartitionStats(), this.reportDetailedPartitionStats(), auxiliaryService, deflater);
-//    }
-    // TODO: need send CDME
+    this.outputContext.notifyProgress();
+    List<Event> eventList = Lists.newLinkedList();
+
+    // 1. Generator VME
+    // TODO: 这里可能生成的统计信息不准确。因为开启auto reduce之后，自动计算的reduce的数目与本地shuffle得到的值不同。
+    VertexManagerEvent vme = ShuffleUtils.generateVMEvent(outputContext, bufferManager.sizePerPartition(), reportDetailedPartitionStats(), deflater);
+    eventList.add(vme);
+
+    // 2. generate DME
+    CompositeDataMovementEvent csdme = generateDMEvent(bufferManager.sizePerPartition());
+    eventList.add(csdme);
+
     return eventList;
+  }
+
+  public CompositeDataMovementEvent generateDMEvent(long[] sizePerPartition) throws IOException {
+    ShuffleUserPayloads.DataMovementEventPayloadProto.Builder payloadBuilder = ShuffleUserPayloads.DataMovementEventPayloadProto
+      .newBuilder();
+
+    sendEmptyPartitionDetails = false;
+    if (sendEmptyPartitionDetails) {
+      BitSet emptyPartitionDetails = new BitSet();
+      // TODO: 生成空分区
+      for (int i = 0; i < sizePerPartition.length; i++) {
+        if (sizePerPartition[i] <= 0) {
+          emptyPartitionDetails.set(i);
+        }
+        int emptyPartitions = emptyPartitionDetails.cardinality();
+        if (emptyPartitions > 0) {
+          // TODO: 本工程的ByteString是pb3, 但是tez是pb2, setEmptyPartitions传入了pb3版本的ByteString会报错，如何解决???
+          ByteString emptyPartitionsBytesString =
+            TezCommonUtils.compressByteArrayToByteString(
+              TezUtilsInternal.toByteArray(emptyPartitionDetails), deflater);
+          payloadBuilder.setEmptyPartitions(emptyPartitionsBytesString);
+          LOG.info("EmptyPartition bitsetSize=" + emptyPartitionDetails.cardinality() + ", numOutputs="
+            + numPartitions + ", emptyPartitions=" + emptyPartitions
+            + ", compressedSize=" + emptyPartitionsBytesString.size());
+        }
+      }
+    }
+
+    // TODO: host port path都是不必要的。以为后面的vertex已经通过配置得到了shuffle server的地址和port, 并可以通过获取上游vertex id得到shuffle id
+//    if (!sendEmptyPartitionDetails || outputGenerated) {
+//      String host = context.getExecutionContext().getHostName();
+//      payloadBuilder.setHost(host);
+//      payloadBuilder.setPort(shufflePort);
+//      //Path component is always 0 indexed
+//      payloadBuilder.setPathComponent(pathComponent);
+//    }
+
+    // A trick method, taskAttemptId store in path component.
+    payloadBuilder.setPathComponent(String.valueOf(taskAttemptId));
+
+    // TODO: 只有在flush阶段才开始调用该操作，因此没必要的发送spill id
+//     payloadBuilder.setSpillId(spillId);
+    payloadBuilder.setLastEvent(true);
+
+    payloadBuilder.setRunDuration(0); //TODO: who is dependent on this?
+    ShuffleUserPayloads.DataMovementEventPayloadProto payloadProto = payloadBuilder.build();
+    byte[] bytes = payloadProto.toByteArray();
+    ByteBuffer payload = ByteBuffer.wrap(bytes, 0, bytes.length);
+
+    CompositeDataMovementEvent csdme = CompositeDataMovementEvent.create(0, this.numPartitions, payload);
+    return csdme;
   }
 
   @Override
@@ -190,5 +286,9 @@ public class RssBaseOrderedPartitionedWriter extends KeyValuesWriter {
 
   private void checkRssException() {
     bufferManager.checkRssException();
+  }
+
+  public boolean reportDetailedPartitionStats() {
+    return reportPartitionStats.isPrecise();
   }
 }

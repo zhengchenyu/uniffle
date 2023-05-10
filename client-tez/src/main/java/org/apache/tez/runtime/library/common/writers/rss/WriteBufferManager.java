@@ -1,4 +1,4 @@
-package org.apache.tez.rss;
+package org.apache.tez.runtime.library.common.writers.rss;
 
 import com.google.common.collect.Lists;
 import com.google.common.collect.Maps;
@@ -15,7 +15,6 @@ import org.apache.hadoop.mapreduce.RssMRUtils;
 import org.apache.tez.dag.common.rss.RssTezConfig;
 import org.apache.tez.dag.common.rss.RssTezUtils;
 import org.apache.tez.runtime.api.OutputContext;
-import org.apache.tez.runtime.api.impl.TezTaskContextImpl;
 import org.apache.tez.runtime.library.common.ConfigUtils;
 import org.apache.uniffle.client.api.ShuffleWriteClient;
 import org.apache.uniffle.client.response.SendShuffleDataResult;
@@ -49,15 +48,16 @@ public class WriteBufferManager<K, V> {
 
   private static final Logger LOG = LoggerFactory.getLogger(WriteBufferManager.class);
 
-  private final OutputContext outputContext;
+  private OutputContext outputContext;
   private Configuration conf;
   private RssConf rssConf;
   private boolean sort;
+  private int numPartitions;
 
   private final Map<Integer, SortWriteBuffer<K, V>> buffers = JavaUtils.newConcurrentMap();
   private final List<SortWriteBuffer<K, V>> waitSendBuffers = Lists.newLinkedList();
 
-  private final Map<Integer, List<ShuffleServerInfo>> partitionToServers;
+  private Map<Integer, List<ShuffleServerInfo>> partitionToServers;
 
   private final ReentrantLock memoryLock = new ReentrantLock();
   private final Condition full = memoryLock.newCondition();
@@ -79,7 +79,7 @@ public class WriteBufferManager<K, V> {
   final long sendCheckTimeout;
   final int bitmapSplitNum;
   final String appId;
-  final int vertexId;
+  final int shuffleId;
 
   protected final Class keyClass;
   protected final Class valClass;
@@ -88,7 +88,7 @@ public class WriteBufferManager<K, V> {
   protected final Serializer valSerializer;
   private final Codec codec;
 
-  private final int taskAttemptId;
+  private final long taskAttemptId;
 
   private final Set<Long> allBlockIds = Sets.newConcurrentHashSet();
 
@@ -110,14 +110,18 @@ public class WriteBufferManager<K, V> {
   private long compressTime = 0;
   private long uncompressedDataLen = 0;
 
+  private int numTasks;
 
-  public WriteBufferManager(OutputContext outputContext, Configuration conf, boolean sort,
-                            Map<Integer, List<ShuffleServerInfo>> partitionToServers) throws IOException {
+  private long[] sizePerPartition;
+
+  public WriteBufferManager(OutputContext outputContext, Configuration conf, boolean sort, int numPartitions,
+      long taskAttemptId, Map<Integer, List<ShuffleServerInfo>> partitionToServers) throws IOException {
     this.outputContext = outputContext;
     // conf include extraConf from RssDagAppMaster
     this.conf = conf;
     this.rssConf = RssTezConfig.toRssConf(this.conf);
     this.sort = sort;
+    this.numPartitions = numPartitions;
     this.partitionToServers = partitionToServers;
 
     int sortmb = this.conf.getInt(TEZ_RUNTIME_IO_SORT_MB, TEZ_RUNTIME_IO_SORT_MB_DEFAULT);
@@ -127,13 +131,14 @@ public class WriteBufferManager<K, V> {
     }
     this.maxMemSize = (long) ByteUnit.MiB.toBytes(sortmb);     // TODO: 是否需要增加系数
 
-    TezTaskContextImpl tezTaskContext = (TezTaskContextImpl) this.outputContext;
-    this.appId = tezTaskContext.getApplicationId().toString() + "." + tezTaskContext.getDAGAttemptNumber();
-    this.vertexId = this.conf.getInt(RssTezConfig.RSS_ASSIGNMENT_PREFIX + "ouput.vertex.id", -1);
-    assert vertexId != -1;
-    if (vertexId == -1) {
-      throw new IOException("Config " + RssTezConfig.RSS_ASSIGNMENT_PREFIX + "ouput.vertex.id is not set!");
+    //TezOutputContextImpl tezTaskContext = (TezOutputContextImpl) this.outputContext;
+    this.appId = outputContext.getApplicationId().toString() + "." + outputContext.getDAGAttemptNumber();
+    this.shuffleId = this.conf.getInt(RssTezConfig.RSS_ASSIGNMENT_PREFIX + "output.vertex.id", -1);
+    //assert vertexId != -1;
+    if (shuffleId == -1) {
+      throw new IOException("Config " + RssTezConfig.RSS_ASSIGNMENT_PREFIX + "output.vertex.id is not set!");
     }
+    this.numTasks = outputContext.getVertexParallelism();       // TODO: check it!!! 检查这个是实际运行task的并行度，还是写分区的个数?????
 
     this.comparator = ConfigUtils.getIntermediateOutputKeyComparator(this.conf);
 
@@ -164,7 +169,7 @@ public class WriteBufferManager<K, V> {
     keySerializer = serializationFactory.getSerializer(keyClass);
     valSerializer = serializationFactory.getSerializer(valClass);
     this.codec = Codec.newInstance(this.rssConf);
-    this.taskAttemptId = this.outputContext.getTaskAttemptNumber();
+    this.taskAttemptId = taskAttemptId;      // vertexid + taskid + taskattemptid
 
     this.sendExecutorService  = Executors.newFixedThreadPool(sendThreadNum,
       ThreadUtils.getThreadFactory("send-thread-%d"));
@@ -176,6 +181,7 @@ public class WriteBufferManager<K, V> {
       throw new RssException("storage type mustn't be empty");
     }
     this.isMemoryShuffleEnabled = StorageType.withMemory(StorageType.valueOf(storageType));
+    this.sizePerPartition = new long[numPartitions];
   }
 
   public void addRecord(int partitionId, K key, V value) throws IOException, InterruptedException {
@@ -199,6 +205,7 @@ public class WriteBufferManager<K, V> {
 
     SortWriteBuffer<K, V> buffer = buffers.get(partitionId);
     long length = buffer.addRecord(key, value);
+    sizePerPartition[partitionId] += length;
     if (length > maxMemSize) {
       throw new RssException("record is too big");
     }
@@ -231,10 +238,9 @@ public class WriteBufferManager<K, V> {
       }
     }
 
-    // 这里numMaps是用于检查当前map是否完成，但是逻辑上不应该使用该方法判断map阶段完成。应该通过tez的事件。
     // TODO: 暂时还没有有效的方式，
     Future<Boolean> future = executor.submit(
-      () -> shuffleWriteClient.sendCommit(serverInfos, appId, vertexId, -1 /*numMaps*/));
+      () -> shuffleWriteClient.sendCommit(serverInfos, appId, shuffleId, numTasks));
     long start = System.currentTimeMillis();
     int currentWait = 200;
     int maxWait = 5000;
@@ -358,7 +364,7 @@ public class WriteBufferManager<K, V> {
     final byte[] compressed = codec.compress(data);
     final long crc32 = ChecksumUtils.getCrc32(compressed);
     compressTime += System.currentTimeMillis() - start;
-    final long blockId = RssTezUtils.getBlockId(partitionId, taskAttemptId, getNextSeqNo(partitionId));
+    final long blockId = RssTezUtils.getBlockId(partitionId, outputContext, getNextSeqNo(partitionId));
     uncompressedDataLen += data.length;
     // add memory to indicate bytes which will be sent to shuffle server
     inSendListBytes.addAndGet(wb.getDataLength());
@@ -409,6 +415,10 @@ public class WriteBufferManager<K, V> {
     if (!failedBlockIds.isEmpty()) {
       throw new RssException("There are some blocks failed");
     }
+  }
+
+  public long[] sizePerPartition() {
+    return sizePerPartition;
   }
 
 }

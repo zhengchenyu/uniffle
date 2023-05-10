@@ -2,6 +2,7 @@ package org.apache.tez.dag.common.rss;
 
 import org.apache.commons.lang3.StringUtils;
 import org.apache.hadoop.conf.Configuration;
+import org.apache.tez.runtime.api.OutputContext;
 import org.apache.uniffle.client.api.ShuffleWriteClient;
 import org.apache.uniffle.client.factory.ShuffleClientFactory;
 import org.apache.uniffle.common.ShuffleServerInfo;
@@ -115,30 +116,30 @@ public class RssTezUtils {
 
   public static int getRequiredShuffleServerNumber(Configuration conf) {
 //    int requiredShuffleServerNumber = con.getInt(
-//      RssMRConfig.RSS_CLIENT_ASSIGNMENT_SHUFFLE_SERVER_NUMBER,
-//      RssMRConfig.RSS_CLIENT_ASSIGNMENT_SHUFFLE_SERVER_NUMBER_DEFAULT_VALUE
+//      RssTezConfig.RSS_CLIENT_ASSIGNMENT_SHUFFLE_SERVER_NUMBER,
+//      RssTezConfig.RSS_CLIENT_ASSIGNMENT_SHUFFLE_SERVER_NUMBER_DEFAULT_VALUE
 //    );
 //    boolean enabledEstimateServer = con.getBoolean(
-//      RssMRConfig.RSS_ESTIMATE_SERVER_ASSIGNMENT_ENABLED,
-//      RssMRConfig.RSS_ESTIMATE_SERVER_ASSIGNMENT_ENABLED_DEFAULT_VALUE
+//      RssTezConfig.RSS_ESTIMATE_SERVER_ASSIGNMENT_ENABLED,
+//      RssTezConfig.RSS_ESTIMATE_SERVER_ASSIGNMENT_ENABLED_DEFAULT_VALUE
 //    );
 //    if (!enabledEstimateServer || requiredShuffleServerNumber > 0) {
 //      return requiredShuffleServerNumber;
 //    }
 //    int taskConcurrency = estimateTaskConcurrency(con);
-//    int taskConcurrencyPerServer = con.getInt(RssMRConfig.RSS_ESTIMATE_TASK_CONCURRENCY_PER_SERVER,
-//      RssMRConfig.RSS_ESTIMATE_TASK_CONCURRENCY_PER_SERVER_DEFAULT_VALUE);
+//    int taskConcurrencyPerServer = con.getInt(RssTezConfig.RSS_ESTIMATE_TASK_CONCURRENCY_PER_SERVER,
+//      RssTezConfig.RSS_ESTIMATE_TASK_CONCURRENCY_PER_SERVER_DEFAULT_VALUE);
 //    return (int) Math.ceil(taskConcurrency * 1.0 / taskConcurrencyPerServer);
     // ZCY TODO: need dynamic number
     return 1;
   }
 
-  public static void buildAssignServers(int reduceId, String[] splitServers,
+  public static void buildAssignServers(int partitionId, String[] splitServers,
                                         Collection<ShuffleServerInfo> assignServers) {
     for (String splitServer : splitServers) {
       String[] serverInfo = splitServer.split(":");
       if (serverInfo.length != 2 && serverInfo.length != 3) {
-        throw new RssException("partition " + reduceId + " server info isn't right");
+        throw new RssException("partition " + partitionId + " server info isn't right");
       }
       ShuffleServerInfo server;
       if (serverInfo.length == 2) {
@@ -153,8 +154,8 @@ public class RssTezUtils {
   }
 
 //  public static int estimateTaskConcurrency(Configuration jobConf) {
-//    double dynamicFactor = jobConf.getDouble(RssMRConfig.RSS_ESTIMATE_TASK_CONCURRENCY_DYNAMIC_FACTOR,
-//      RssMRConfig.RSS_ESTIMATE_TASK_CONCURRENCY_DYNAMIC_FACTOR_DEFAULT_VALUE);
+//    double dynamicFactor = jobConf.getDouble(RssTezConfig.RSS_ESTIMATE_TASK_CONCURRENCY_DYNAMIC_FACTOR,
+//      RssTezConfig.RSS_ESTIMATE_TASK_CONCURRENCY_DYNAMIC_FACTOR_DEFAULT_VALUE);
 //    double slowStart = jobConf.getDouble(Constants.MR_SLOW_START, Constants.MR_SLOW_START_DEFAULT_VALUE);
 //    int mapNum = jobConf.getNumMapTasks();
 //    int reduceNum = jobConf.getNumReduceTasks();
@@ -173,8 +174,9 @@ public class RssTezUtils {
   private static final int MAX_ATTEMPT_LENGTH = 6;
   private static final long MAX_ATTEMPT_ID = (1 << MAX_ATTEMPT_LENGTH) - 1;
 
-  public static long getBlockId(long partitionId, long taskAttemptId, int nextSeqNo) {
-    long attemptId = taskAttemptId >> (Constants.PARTITION_ID_MAX_LENGTH + Constants.TASK_ATTEMPT_ID_MAX_LENGTH);
+  // TODO: getBlockId 和convertTaskAttemptIdToLong进行统一。考虑是否可以与MR中的统一。全局的taskattemptid需要重新命令，因为包括了vertexid, taskid, taskattemptid
+  public static long getBlockId(long partitionId, OutputContext context, int nextSeqNo) {
+    long attemptId = context.getTaskAttemptNumber();
     if (attemptId < 0 || attemptId > MAX_ATTEMPT_ID) {
       throw new RssException("Can't support attemptId [" + attemptId
         + "], the max value should be " + MAX_ATTEMPT_ID);
@@ -188,8 +190,7 @@ public class RssTezUtils {
       throw new RssException("Can't support partitionId["
         + partitionId + "], the max value should be " + Constants.MAX_PARTITION_ID);
     }
-    long taskId = taskAttemptId - (attemptId
-      << (Constants.PARTITION_ID_MAX_LENGTH + Constants.TASK_ATTEMPT_ID_MAX_LENGTH));
+    long taskId = context.getTaskIndex();
     if (taskId < 0 ||  taskId > Constants.MAX_TASK_ATTEMPT_ID) {
       throw new RssException("Can't support taskId["
         + taskId + "], the max value should be " + Constants.MAX_TASK_ATTEMPT_ID);
@@ -197,4 +198,58 @@ public class RssTezUtils {
     return (atomicInt << (Constants.PARTITION_ID_MAX_LENGTH + Constants.TASK_ATTEMPT_ID_MAX_LENGTH))
       + (partitionId << Constants.TASK_ATTEMPT_ID_MAX_LENGTH) + taskId;
   }
+
+  private final static int TASK_ATTEMPT_ID_MAX_LENGTH = 8;
+  private final static int TASK_ID_MAX_LENGTH = 32;
+  private final static int VERTEX_ID_MAX_LENGTH = 16;
+
+  public static final long MAX_TASK_ATTEMPT_ID = (1l << TASK_ATTEMPT_ID_MAX_LENGTH) - 1;
+  public static final long MAX_TASK_ID = (1l << TASK_ID_MAX_LENGTH) - 1;
+  public static final long MAX_VERTEX_ID = (1l << VERTEX_ID_MAX_LENGTH) - 1;
+
+  public static long convertTaskAttemptIdToLong(int vertexId, int taskId, int taskAttemptId) {
+    if (vertexId > MAX_VERTEX_ID) {
+      throw new RssException("Vertex " + vertexId +  " exceed");
+    }
+    if (taskId > MAX_TASK_ID) {
+      throw new RssException("Task " + taskId +  " exceed");
+    }
+    if (taskAttemptId > MAX_TASK_ATTEMPT_ID) {
+      throw new RssException("TaskAttempt " + vertexId +  " exceed");
+    }
+    return (vertexId << (MAX_TASK_ATTEMPT_ID + MAX_TASK_ID)) + taskId << MAX_TASK_ATTEMPT_ID + taskAttemptId;
+  }
+
+//  public static RoaringBitmap getPartitionStatsForPhysicalOutput(long[] sizes) {
+//    RoaringBitmap partitionStats = new RoaringBitmap();
+//    if (sizes == null || sizes.length == 0) {
+//      return partitionStats;
+//    }
+//    final int RANGE_LEN = DATA_RANGE_IN_MB.values().length;
+//    for (int i = 0; i < sizes.length; i++) {
+//      int bucket = DATA_RANGE_IN_MB.getRange(sizes[i]).ordinal();
+//      int index = i * (RANGE_LEN);
+//      partitionStats.add(index + bucket);
+//    }
+//    return partitionStats;
+//  }
+//
+//  @InterfaceAudience.Private
+//  public static ByteString compressByteArrayToByteString(byte[] inBytes, Deflater deflater) throws IOException {
+//    deflater.reset();
+//    ByteString.Output os = ByteString.newOutput();
+//    DeflaterOutputStream compressOs = null;
+//    try {
+//      compressOs = new DeflaterOutputStream(os, deflater);
+//      compressOs.write(inBytes);
+//      compressOs.finish();
+//      ByteString byteString = os.toByteString();
+//      return byteString;
+//    } finally {
+//      if (compressOs != null) {
+//        compressOs.close();
+//      }
+//    }
+//  }
+
 }

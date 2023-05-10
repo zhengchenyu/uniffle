@@ -53,7 +53,7 @@ public class RssMRUtils {
     if (appAttemptId < 1) {
       throw new RssException("appAttemptId " + appAttemptId + " is wrong");
     }
-    long highBytes = (long)taskAttemptID.getId() - (appAttemptId - 1) * 1000;
+    long highBytes = (long)taskAttemptID.getId() - (appAttemptId - 1) * 1000;       // taskAttemptID.getId()是attempt次数
     if (highBytes > MAX_ATTEMPT_ID || highBytes < 0) {
       throw new RssException("TaskAttempt " + taskAttemptID + " high bytes " + highBytes + " exceed");
     }
