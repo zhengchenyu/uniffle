@@ -11,7 +11,6 @@ import org.apache.hadoop.io.serializer.SerializationFactory;
 import org.apache.hadoop.io.serializer.Serializer;
 import org.apache.hadoop.mapred.SortWriteBuffer;
 import org.apache.hadoop.mapreduce.RssMRConfig;
-import org.apache.hadoop.mapreduce.RssMRUtils;
 import org.apache.tez.dag.common.rss.RssTezConfig;
 import org.apache.tez.dag.common.rss.RssTezUtils;
 import org.apache.tez.runtime.api.OutputContext;
@@ -307,7 +306,7 @@ public class WriteBufferManager<K, V> {
     }
 
     start = System.currentTimeMillis();
-    shuffleWriteClient.reportShuffleResult(partitionToServers, appId, 0,
+    shuffleWriteClient.reportShuffleResult(partitionToServers, appId, shuffleId,
       taskAttemptId, partitionToBlocks, bitmapSplitNum);
     LOG.info("Report shuffle result for task[{}] with bitmapNum[{}] cost {} ms",
       taskAttemptId, bitmapSplitNum, (System.currentTimeMillis() - start));
@@ -368,7 +367,7 @@ public class WriteBufferManager<K, V> {
     uncompressedDataLen += data.length;
     // add memory to indicate bytes which will be sent to shuffle server
     inSendListBytes.addAndGet(wb.getDataLength());
-    return new ShuffleBlockInfo(0, partitionId, blockId, compressed.length, crc32,
+    return new ShuffleBlockInfo(shuffleId, partitionId, blockId, compressed.length, crc32,
       compressed, partitionToServers.get(partitionId), uncompressLength, wb.getDataLength(), taskAttemptId);
   }
 

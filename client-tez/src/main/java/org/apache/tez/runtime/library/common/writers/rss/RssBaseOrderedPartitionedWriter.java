@@ -182,68 +182,27 @@ public class RssBaseOrderedPartitionedWriter extends KeyValuesWriter {
   private List<Event> generateEvents() throws IOException {
     this.outputContext.notifyProgress();
     List<Event> eventList = Lists.newLinkedList();
+    long[]  sizePerPartition = bufferManager.sizePerPartition();
 
     // 1. Generator VME
     // TODO: 这里可能生成的统计信息不准确。因为开启auto reduce之后，自动计算的reduce的数目与本地shuffle得到的值不同。
-    VertexManagerEvent vme = ShuffleUtils.generateVMEvent(outputContext, bufferManager.sizePerPartition(), reportDetailedPartitionStats(), deflater);
+    VertexManagerEvent vme = ShuffleUtils.generateVMEvent(outputContext, sizePerPartition, reportDetailedPartitionStats(), deflater);
     eventList.add(vme);
 
     // 2. generate DME
-    CompositeDataMovementEvent csdme = generateDMEvent(bufferManager.sizePerPartition());
-    eventList.add(csdme);
-
-    return eventList;
-  }
-
-  public CompositeDataMovementEvent generateDMEvent(long[] sizePerPartition) throws IOException {
-    ShuffleUserPayloads.DataMovementEventPayloadProto.Builder payloadBuilder = ShuffleUserPayloads.DataMovementEventPayloadProto
-      .newBuilder();
-
-    sendEmptyPartitionDetails = false;
+    BitSet emptyPartitionDetails = new BitSet();
     if (sendEmptyPartitionDetails) {
-      BitSet emptyPartitionDetails = new BitSet();
-      // TODO: 生成空分区
       for (int i = 0; i < sizePerPartition.length; i++) {
         if (sizePerPartition[i] <= 0) {
           emptyPartitionDetails.set(i);
         }
-        int emptyPartitions = emptyPartitionDetails.cardinality();
-        if (emptyPartitions > 0) {
-          // TODO: 本工程的ByteString是pb3, 但是tez是pb2, setEmptyPartitions传入了pb3版本的ByteString会报错，如何解决???
-          ByteString emptyPartitionsBytesString =
-            TezCommonUtils.compressByteArrayToByteString(
-              TezUtilsInternal.toByteArray(emptyPartitionDetails), deflater);
-          payloadBuilder.setEmptyPartitions(emptyPartitionsBytesString);
-          LOG.info("EmptyPartition bitsetSize=" + emptyPartitionDetails.cardinality() + ", numOutputs="
-            + numPartitions + ", emptyPartitions=" + emptyPartitions
-            + ", compressedSize=" + emptyPartitionsBytesString.size());
-        }
       }
     }
+    CompositeDataMovementEvent csdme = ShuffleUtils.generateDMEvent(null, -1, numPartitions, false, -1, true,
+      String.valueOf(taskAttemptId), emptyPartitionDetails, deflater);
+    eventList.add(csdme);
 
-    // TODO: host port path都是不必要的。以为后面的vertex已经通过配置得到了shuffle server的地址和port, 并可以通过获取上游vertex id得到shuffle id
-//    if (!sendEmptyPartitionDetails || outputGenerated) {
-//      String host = context.getExecutionContext().getHostName();
-//      payloadBuilder.setHost(host);
-//      payloadBuilder.setPort(shufflePort);
-//      //Path component is always 0 indexed
-//      payloadBuilder.setPathComponent(pathComponent);
-//    }
-
-    // A trick method, taskAttemptId store in path component.
-    payloadBuilder.setPathComponent(String.valueOf(taskAttemptId));
-
-    // TODO: 只有在flush阶段才开始调用该操作，因此没必要的发送spill id
-//     payloadBuilder.setSpillId(spillId);
-    payloadBuilder.setLastEvent(true);
-
-    payloadBuilder.setRunDuration(0); //TODO: who is dependent on this?
-    ShuffleUserPayloads.DataMovementEventPayloadProto payloadProto = payloadBuilder.build();
-    byte[] bytes = payloadProto.toByteArray();
-    ByteBuffer payload = ByteBuffer.wrap(bytes, 0, bytes.length);
-
-    CompositeDataMovementEvent csdme = CompositeDataMovementEvent.create(0, this.numPartitions, payload);
-    return csdme;
+    return eventList;
   }
 
   @Override

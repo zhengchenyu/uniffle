@@ -18,6 +18,7 @@ import org.slf4j.LoggerFactory;
 import java.io.IOException;
 import java.util.BitSet;
 import java.util.List;
+import java.util.Map;
 import java.util.concurrent.atomic.AtomicInteger;
 import java.util.zip.Inflater;
 
@@ -54,40 +55,24 @@ public class RssShuffleInputEventHandlerOrderedGrouped implements ShuffleEventHa
     if (event instanceof DataMovementEvent) {
       numDmeEvents.incrementAndGet();
       DataMovementEvent dmEvent = (DataMovementEvent)event;
-      DataMovementEventPayloadProto shufflePayload;
+      Map<String, Object> shufflePayload;
       try {
-        shufflePayload = DataMovementEventPayloadProto.parseFrom(ByteString.copyFrom(dmEvent.getUserPayload()).toByteArray());
+        shufflePayload = ShuffleUtils.parseDataMovementEventPayload(dmEvent.getUserPayload(), inflater);
       } catch (IOException e) {
         throw new TezUncheckedException("Unable to parse DataMovementEvent payload", e);
       }
-      BitSet emptyPartitionsBitSet = null;
-      if (shufflePayload.hasEmptyPartitions()) {
-        try {
-          byte[] emptyPartitions = TezCommonUtils.decompressByteStringToByteArray(shufflePayload.getEmptyPartitions(), inflater);
-          emptyPartitionsBitSet = TezUtilsInternal.fromByteArray(emptyPartitions);
-        } catch (IOException e) {
-          throw new TezUncheckedException("Unable to set the empty partition to succeeded", e);
-        }
-      }
+      BitSet emptyPartitionsBitSet = (BitSet) shufflePayload.get("empty_partitions");
       processDataMovementEvent(dmEvent, shufflePayload, emptyPartitionsBitSet);
       scheduler.updateEventReceivedTime();
     } else if (event instanceof CompositeRoutedDataMovementEvent) {
       CompositeRoutedDataMovementEvent crdme = (CompositeRoutedDataMovementEvent)event;
-      DataMovementEventPayloadProto shufflePayload;
+      Map<String, Object> shufflePayload;
       try {
-        shufflePayload = DataMovementEventPayloadProto.parseFrom(ByteString.copyFrom(crdme.getUserPayload()).toByteArray());
+        shufflePayload = ShuffleUtils.parseDataMovementEventPayload(crdme.getUserPayload(), inflater);
       } catch (IOException e) {
         throw new TezUncheckedException("Unable to parse DataMovementEvent payload", e);
       }
-      BitSet emptyPartitionsBitSet = null;
-      if (shufflePayload.hasEmptyPartitions()) {
-        try {
-          byte[] emptyPartitions = TezCommonUtils.decompressByteStringToByteArray(shufflePayload.getEmptyPartitions(), inflater);
-          emptyPartitionsBitSet = TezUtilsInternal.fromByteArray(emptyPartitions);
-        } catch (IOException e) {
-          throw new TezUncheckedException("Unable to set the empty partition to succeeded", e);
-        }
-      }
+      BitSet emptyPartitionsBitSet = (BitSet) shufflePayload.get("empty_partitions");
       for (int offset = 0; offset < crdme.getCount(); offset++) {
         numDmeEvents.incrementAndGet();
         processDataMovementEvent(crdme.expand(offset), shufflePayload, emptyPartitionsBitSet);
@@ -104,17 +89,17 @@ public class RssShuffleInputEventHandlerOrderedGrouped implements ShuffleEventHa
     }
   }
 
-  private void processDataMovementEvent(DataMovementEvent dmEvent, DataMovementEventPayloadProto shufflePayload,
+  private void processDataMovementEvent(DataMovementEvent dmEvent, Map<String, Object> shufflePayload,
                                         BitSet emptyPartitionsBitSet) throws IOException {
     int partitionId = dmEvent.getSourceIndex();
     RssInputAttemptIdentifier srcAttemptIdentifier = new RssInputAttemptIdentifier(dmEvent.getTargetIndex(), dmEvent.getVersion());
 
     if (LOG.isDebugEnabled()) {
       LOG.debug("DME srcIdx: " + partitionId + ", targetIdx: " + dmEvent.getTargetIndex()
-        + ", attemptNum: " + dmEvent.getVersion() + ", payload: " + ShuffleUtils.stringify(shufflePayload));
+        + ", attemptNum: " + dmEvent.getVersion() + ", payload: " + shufflePayload);
     }
 
-    if (shufflePayload.hasEmptyPartitions()) {
+    if (shufflePayload.containsKey("empty_partitions")) {
       try {
         if (emptyPartitionsBitSet.get(partitionId)) {
           if (LOG.isDebugEnabled()) {
@@ -131,7 +116,7 @@ public class RssShuffleInputEventHandlerOrderedGrouped implements ShuffleEventHa
       }
     }
 
-    long taskAttemptId = Long.parseLong(shufflePayload.getPathComponent());
+    long taskAttemptId = Long.parseLong((String) shufflePayload.get("path_component"));
     scheduler.addKnownInput(partitionId, srcAttemptIdentifier, taskAttemptId);
   }
 

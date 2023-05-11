@@ -179,7 +179,6 @@ public class RssDAGAppMaster extends DAGAppMaster {
       final int finalPartitions = partitions;
       if (partitions > 0) {
         Vertex sourceVertex = dag.getVertex(edge.getSourceVertexName());
-//        Vertex destinationVertex = dag.getVertex(edge.getDestinationVertexName());
         ShuffleAssignmentsInfo response;
         try {
           response = RetryUtils.retry(() -> {
@@ -227,7 +226,6 @@ public class RssDAGAppMaster extends DAGAppMaster {
                 servers.add(server.getHost() + ":" + server.getGrpcPort());
               }
             }
-//            extraConf.set(RssTezConfig.RSS_ASSIGNMENT_PREFIX + edgeId + "." + partitionToServer.getKey(), StringUtils.join(servers, ","));
             try {
               Configuration filteredExtraConf = RssTezConfig.filterRssConf(extraConf);      // kvwriter and shuffle should get rss configuration
 
@@ -240,16 +238,12 @@ public class RssDAGAppMaster extends DAGAppMaster {
               Configuration edgeDestinationConf = TezUtils.createConfFromUserPayload(edge.getEdgeProperty().getEdgeSource().getUserPayload());
               edgeDestinationConf.set(RssTezConfig.RSS_ASSIGNMENT_PREFIX + sourceVertex.getVertexId().getId() + "." + partitionToServer.getKey(), StringUtils.join(servers, ","));
               edgeDestinationConf.setInt(RssTezConfig.RSS_ASSIGNMENT_PREFIX + "input.vertex.id", sourceVertex.getVertexId().getId());
-              edgeDestinationConf.setInt(RssTezConfig.RSS_ASSIGNMENT_PREFIX + "number", finalPartitions);   // partition number
+              edgeDestinationConf.setInt(RssTezConfig.RSS_ASSIGNMENT_PREFIX + "number", finalPartitions);
               edgeDestinationConf.addResource(filteredExtraConf);
               edge.getEdgeProperty().getEdgeDestination().setUserPayload(TezUtils.createUserPayloadFromConf(edgeDestinationConf));
             } catch (IOException e) {
               throw new RssException(e);
             }
-//            sourceVertex.getConf().set(RssTezConfig.RSS_ASSIGNMENT_PREFIX + sourceVertex.getVertexId().getId() + "." + partitionToServer.getKey(), StringUtils.join(servers, ","));
-//            sourceVertex.getConf().setInt(RssTezConfig.RSS_ASSIGNMENT_PREFIX + "output.vertex.id", sourceVertex.getVertexId().getId());
-//            destinationVertex.getConf().set(RssTezConfig.RSS_ASSIGNMENT_PREFIX + sourceVertex.getVertexId().getId() + "." + partitionToServer.getKey(), StringUtils.join(servers, ","));
-//            destinationVertex.getConf().setInt(RssTezConfig.RSS_ASSIGNMENT_PREFIX + "input.vertex.id", sourceVertex.getVertexId().getId());
           });
         }
       }
