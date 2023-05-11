@@ -173,7 +173,7 @@ public class RssShuffleScheduler<K, V> {
     this.partitionNumPerRange = this.conf.getInt(RssTezConfig.RSS_PARTITION_NUM_PER_RANGE,
       RssTezConfig.RSS_PARTITION_NUM_PER_RANGE_DEFAULT_VALUE);
 
-    this.numPartitions = conf.getInt(RssTezConfig.RSS_ASSIGNMENT_PREFIX + "number", 0);
+    this.numPartitions = conf.getInt(RssTezConfig.RSS_ASSIGNMENT_NUM_PARTITIONS, 0);
     if (this.numPartitions < 0) {
       throw new TezUncheckedException("Wrong numPartitions" + this.numPartitions);
     }

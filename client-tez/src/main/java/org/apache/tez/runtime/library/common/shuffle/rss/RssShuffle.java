@@ -17,6 +17,7 @@ import org.apache.tez.common.counters.TaskCounter;
 import org.apache.tez.common.counters.TezCounter;
 import org.apache.tez.dag.api.TezException;
 import org.apache.tez.dag.common.rss.RssTezConfig;
+import org.apache.tez.dag.common.rss.RssTezUtils;
 import org.apache.tez.runtime.api.Event;
 import org.apache.tez.runtime.api.InputContext;
 import org.apache.tez.runtime.api.TaskFailureType;
@@ -157,11 +158,10 @@ public class RssShuffle implements OrderedShufflePlugin, ExceptionReporter {
     this.numInputs = numInputs;
     this.initialMemoryAvailable = initialMemoryAvailable;
 
-
-    this.appId = context.getApplicationId().toString() + "." + context.getDAGAttemptNumber();
-    this.shuffleId = this.conf.getInt(RssTezConfig.RSS_ASSIGNMENT_PREFIX + "input.vertex.id", -1);
+    this.appId = RssTezUtils.constructAppId(context.getApplicationId(), context.getDAGAttemptNumber());
+    this.shuffleId = this.conf.getInt(RssTezConfig.RSS_ASSIGNMENT_SHUFFLE_ID, -1);
     if (shuffleId == -1) {
-      throw new IOException("Config " + RssTezConfig.RSS_ASSIGNMENT_PREFIX + "output.vertex.id is not set!");
+      throw new IOException("Config " + RssTezConfig.RSS_ASSIGNMENT_SHUFFLE_ID + " in RssShuffle is not set!");
     }
     //this.reduceId = context.getTaskVertexIndex();
 

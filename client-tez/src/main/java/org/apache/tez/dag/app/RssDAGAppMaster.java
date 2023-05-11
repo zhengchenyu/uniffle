@@ -1,11 +1,8 @@
 package org.apache.tez.dag.app;
 
-import com.google.common.collect.Lists;
-import com.google.common.collect.Sets;
 import org.apache.commons.cli.CommandLine;
 import org.apache.commons.cli.GnuParser;
 import org.apache.commons.cli.Options;
-import org.apache.commons.lang3.StringUtils;
 import org.apache.hadoop.conf.Configuration;
 import org.apache.hadoop.security.Credentials;
 import org.apache.hadoop.security.UserGroupInformation;
@@ -19,51 +16,22 @@ import org.apache.hadoop.yarn.util.Clock;
 import org.apache.hadoop.yarn.util.ConverterUtils;
 import org.apache.hadoop.yarn.util.SystemClock;
 import org.apache.tez.common.TezCommonUtils;
-import org.apache.tez.common.TezUtils;
 import org.apache.tez.common.TezUtilsInternal;
 import org.apache.tez.common.VersionInfo;
 import org.apache.tez.dag.api.TezConfiguration;
 import org.apache.tez.dag.api.TezConstants;
 import org.apache.tez.dag.api.records.DAGProtos;
-import org.apache.tez.dag.app.dag.Vertex;
 import org.apache.tez.dag.app.dag.impl.DAGImpl;
-import org.apache.tez.dag.app.dag.impl.Edge;
-import org.apache.tez.dag.common.rss.RssTezConfig;
 import org.apache.tez.dag.common.rss.RssTezUtils;
 import org.apache.tez.dag.records.TezDAGID;
-import org.apache.uniffle.client.api.ShuffleWriteClient;
-import org.apache.uniffle.client.util.ClientUtils;
-import org.apache.uniffle.common.*;
-import org.apache.uniffle.common.exception.RssException;
-import org.apache.uniffle.common.util.Constants;
-import org.apache.uniffle.common.util.RetryUtils;
-import org.apache.uniffle.storage.util.StorageType;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 import java.io.IOException;
-import java.util.*;
-import java.util.concurrent.Executors;
-import java.util.concurrent.ScheduledExecutorService;
-import java.util.concurrent.ThreadFactory;
-import java.util.concurrent.TimeUnit;
 
 public class RssDAGAppMaster extends DAGAppMaster {
 
   private static final Logger LOG = LoggerFactory.getLogger(DAGAppMaster.class);
-
-  private Configuration conf;
-
-  final ScheduledExecutorService scheduledExecutorService = Executors.newSingleThreadScheduledExecutor(
-    new ThreadFactory() {
-      @Override
-      public Thread newThread(Runnable r) {
-        Thread t = Executors.defaultThreadFactory().newThread(r);
-        t.setDaemon(true);
-        return t;
-      }
-    }
-  );
 
   public RssDAGAppMaster(ApplicationAttemptId applicationAttemptId, ContainerId containerId, String nmHost,
                          int nmPort, int nmHttpPort, Clock clock, long appSubmitTime, boolean isSession,
@@ -76,8 +44,12 @@ public class RssDAGAppMaster extends DAGAppMaster {
 
   @Override
   public synchronized void serviceInit(Configuration conf) throws Exception {
+    // There are no container to share between attempts. Rss don't support shared container between attempts yet.
+    if (conf.getBoolean(TezConfiguration.DAG_RECOVERY_ENABLED, TezConfiguration.DAG_RECOVERY_ENABLED_DEFAULT)) {
+      conf.getBoolean(TezConfiguration.DAG_RECOVERY_ENABLED, false);
+      LOG.warn("close recovery enable, because RSS doesn't support it yet");
+    }
     super.serviceInit(conf);
-    this.conf = conf;
   }
 
   private static void validateInputParam(String value, String param)
@@ -91,7 +63,9 @@ public class RssDAGAppMaster extends DAGAppMaster {
 
   DAGImpl createDAG(DAGProtos.DAGPlan dagPB, TezDAGID dagId) {
     DAGImpl dag = super.createDAG(dagPB, dagId);
-    return new RssDAGImpl(dag, this.conf, this.getAppID(), this.getAttemptID());
+    // We can't get ApplicationAttemptId from TezTaskContextImpl, so we use ApplicationId + attemptId
+    return new RssDAGImpl(dag, super.getContext().getAMConf(),
+        RssTezUtils.constructAppId(this.getAppID(), this.getAttemptID().getAttemptId()));
   }
 
   public static void main(String[] args) {

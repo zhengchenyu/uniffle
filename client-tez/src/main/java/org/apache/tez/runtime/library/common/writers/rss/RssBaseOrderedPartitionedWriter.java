@@ -145,9 +145,7 @@ public class RssBaseOrderedPartitionedWriter extends KeyValuesWriter {
 
   private Map<Integer, List<ShuffleServerInfo>> createAssignmentMap(Configuration conf) {
     Map<Integer, List<ShuffleServerInfo>> partitionToServers = Maps.newHashMap();
-//    String edgeId = this.outputContext.getDestinationVertexName();
-    // sourceVertex.getConf().setInt(RssTezConfig.RSS_ASSIGNMENT_PREFIX + "output.vertex.id", sourceVertex.getVertexId().getId());
-    int vertexId = this.conf.getInt(RssTezConfig.RSS_ASSIGNMENT_PREFIX + "output.vertex.id", -1);
+    int vertexId = this.conf.getInt(RssTezConfig.RSS_ASSIGNMENT_SHUFFLE_ID, -1);
     assert vertexId != -1;
     assert vertexId == this.outputContext.getTaskVertexIndex();     // TODO: Remove it! Only for debug.
     for (int i = 0; i < this.numPartitions; i++) {

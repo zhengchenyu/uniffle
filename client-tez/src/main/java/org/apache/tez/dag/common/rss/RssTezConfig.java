@@ -117,8 +117,6 @@ public class RssTezConfig {
   public static final String RSS_HEARTBEAT_TIMEOUT =
     TEZ_RSS_CONFIG_PREFIX + RssClientConfig.RSS_HEARTBEAT_TIMEOUT;
 
-  public static final String RSS_ASSIGNMENT_PREFIX = TEZ_RSS_CONFIG_PREFIX + "rss.assignment.partition.";
-
   public static final String RSS_CLIENT_MAX_SEGMENT_SIZE =
     TEZ_RSS_CONFIG_PREFIX + "rss.client.max.buffer.size";
   public static final long RSS_CLIENT_DEFAULT_MAX_SEGMENT_SIZE = 3 * 1024;
@@ -153,6 +151,18 @@ public class RssTezConfig {
     TEZ_RSS_CONFIG_PREFIX + RssClientConfig.RSS_PARTITION_NUM_PER_RANGE;
   public static final int RSS_PARTITION_NUM_PER_RANGE_DEFAULT_VALUE =
     RssClientConfig.RSS_PARTITION_NUM_PER_RANGE_DEFAULT_VALUE;
+
+  public static final String RSS_CLIENT_ASSIGNMENT_SHUFFLE_SERVER_NUMBER =
+    RssClientConfig.RSS_CLIENT_ASSIGNMENT_SHUFFLE_SERVER_NUMBER;
+  public static final int RSS_CLIENT_ASSIGNMENT_SHUFFLE_SERVER_NUMBER_DEFAULT_VALUE =
+    RssClientConfig.RSS_CLIENT_ASSIGNMENT_SHUFFLE_SERVER_NUMBER_DEFAULT_VALUE;
+
+
+  // Assignment
+  public static final String RSS_ASSIGNMENT_PREFIX = TEZ_RSS_CONFIG_PREFIX + "rss.assignment.partition.";
+  public static final String RSS_ASSIGNMENT_SHUFFLE_ID = RssTezConfig.RSS_ASSIGNMENT_PREFIX + "output.vertex.id";
+  public static final String RSS_ASSIGNMENT_NUM_PARTITIONS = RssTezConfig.RSS_ASSIGNMENT_PREFIX + "number.partitions";
+
 
   public static RssConf toRssConf(Configuration tezConf) {
     RssConf rssConf = new RssConf();

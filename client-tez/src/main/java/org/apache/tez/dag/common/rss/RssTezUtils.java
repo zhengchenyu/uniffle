@@ -2,6 +2,8 @@ package org.apache.tez.dag.common.rss;
 
 import org.apache.commons.lang3.StringUtils;
 import org.apache.hadoop.conf.Configuration;
+import org.apache.hadoop.util.FastNumberFormat;
+import org.apache.hadoop.yarn.api.records.ApplicationId;
 import org.apache.tez.runtime.api.OutputContext;
 import org.apache.uniffle.client.api.ShuffleWriteClient;
 import org.apache.uniffle.client.factory.ShuffleClientFactory;
@@ -11,12 +13,18 @@ import org.apache.uniffle.common.util.Constants;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
+import java.lang.reflect.Field;
 import java.util.Collection;
 import java.util.Map;
 
 public class RssTezUtils {
 
   private static final Logger LOG = LoggerFactory.getLogger(RssTezUtils.class);
+
+  public static final String appAttemptIdStrPrefix = "appattempt";
+  private static final String APP_ATTEMPT_ID_PREFIX = appAttemptIdStrPrefix + '_';
+  private static final int ATTEMPT_ID_MIN_DIGITS = 6;
+  private static final int APP_ID_MIN_DIGITS = 4;
 
   public static ShuffleWriteClient createShuffleClient(Configuration conf) {
     int heartBeatThreadNum = conf.getInt(RssTezConfig.RSS_CLIENT_HEARTBEAT_THREAD_NUM,
@@ -115,23 +123,12 @@ public class RssTezUtils {
   }
 
   public static int getRequiredShuffleServerNumber(Configuration conf) {
-//    int requiredShuffleServerNumber = con.getInt(
-//      RssTezConfig.RSS_CLIENT_ASSIGNMENT_SHUFFLE_SERVER_NUMBER,
-//      RssTezConfig.RSS_CLIENT_ASSIGNMENT_SHUFFLE_SERVER_NUMBER_DEFAULT_VALUE
-//    );
-//    boolean enabledEstimateServer = con.getBoolean(
-//      RssTezConfig.RSS_ESTIMATE_SERVER_ASSIGNMENT_ENABLED,
-//      RssTezConfig.RSS_ESTIMATE_SERVER_ASSIGNMENT_ENABLED_DEFAULT_VALUE
-//    );
-//    if (!enabledEstimateServer || requiredShuffleServerNumber > 0) {
-//      return requiredShuffleServerNumber;
-//    }
-//    int taskConcurrency = estimateTaskConcurrency(con);
-//    int taskConcurrencyPerServer = con.getInt(RssTezConfig.RSS_ESTIMATE_TASK_CONCURRENCY_PER_SERVER,
-//      RssTezConfig.RSS_ESTIMATE_TASK_CONCURRENCY_PER_SERVER_DEFAULT_VALUE);
-//    return (int) Math.ceil(taskConcurrency * 1.0 / taskConcurrencyPerServer);
-    // ZCY TODO: need dynamic number
-    return 1;
+    int requiredShuffleServerNumber = conf.getInt(
+      RssTezConfig.RSS_CLIENT_ASSIGNMENT_SHUFFLE_SERVER_NUMBER,
+      RssTezConfig.RSS_CLIENT_ASSIGNMENT_SHUFFLE_SERVER_NUMBER_DEFAULT_VALUE
+    );
+    // TODO: estimate task concurrency
+    return requiredShuffleServerNumber;
   }
 
   public static void buildAssignServers(int partitionId, String[] splitServers,
@@ -152,24 +149,6 @@ public class RssTezUtils {
       assignServers.add(server);
     }
   }
-
-//  public static int estimateTaskConcurrency(Configuration jobConf) {
-//    double dynamicFactor = jobConf.getDouble(RssTezConfig.RSS_ESTIMATE_TASK_CONCURRENCY_DYNAMIC_FACTOR,
-//      RssTezConfig.RSS_ESTIMATE_TASK_CONCURRENCY_DYNAMIC_FACTOR_DEFAULT_VALUE);
-//    double slowStart = jobConf.getDouble(Constants.MR_SLOW_START, Constants.MR_SLOW_START_DEFAULT_VALUE);
-//    int mapNum = jobConf.getNumMapTasks();
-//    int reduceNum = jobConf.getNumReduceTasks();
-//    int mapLimit = jobConf.getInt(Constants.MR_MAP_LIMIT, Constants.MR_MAP_LIMIT_DEFAULT_VALUE);
-//    int reduceLimit = jobConf.getInt(Constants.MR_REDUCE_LIMIT, Constants.MR_REDUCE_LIMIT_DEFAULT_VALUE);
-//
-//    int estimateMapNum = mapLimit > 0 ? Math.min(mapNum, mapLimit) : mapNum;
-//    int estimateReduceNum = reduceLimit > 0 ? Math.min(reduceNum, reduceLimit) : reduceNum;
-//    if (slowStart == 1) {
-//      return (int) (Math.max(estimateMapNum, estimateReduceNum) * dynamicFactor);
-//    } else {
-//      return (int) (((1 - slowStart) * estimateMapNum + estimateReduceNum) * dynamicFactor);
-//    }
-//  }
 
   private static final int MAX_ATTEMPT_LENGTH = 6;
   private static final long MAX_ATTEMPT_ID = (1 << MAX_ATTEMPT_LENGTH) - 1;
@@ -251,5 +230,27 @@ public class RssTezUtils {
 //      }
 //    }
 //  }
+
+
+  public static Object getPrivateStaticField(String name, Object object) {
+    try {
+      Field f = object.getClass().getDeclaredField(name);
+      f.setAccessible(true);
+      return f.get(object);
+    } catch (Exception e) {
+      throw new RssException(e);
+    }
+  }
+
+  public static String constructAppId(ApplicationId applicationId, int appAttemptId) {
+    StringBuilder sb = new StringBuilder(64);
+    sb.append(APP_ATTEMPT_ID_PREFIX);
+    sb.append(applicationId.getClusterTimestamp());
+    sb.append('_');
+    FastNumberFormat.format(sb, applicationId.getId(), APP_ID_MIN_DIGITS);
+    sb.append('_');
+    FastNumberFormat.format(sb, appAttemptId, ATTEMPT_ID_MIN_DIGITS);
+    return sb.toString();
+  }
 
 }

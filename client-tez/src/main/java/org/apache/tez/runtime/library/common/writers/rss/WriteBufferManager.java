@@ -11,6 +11,7 @@ import org.apache.hadoop.io.serializer.SerializationFactory;
 import org.apache.hadoop.io.serializer.Serializer;
 import org.apache.hadoop.mapred.SortWriteBuffer;
 import org.apache.hadoop.mapreduce.RssMRConfig;
+import org.apache.hadoop.yarn.api.records.ApplicationId;
 import org.apache.tez.dag.common.rss.RssTezConfig;
 import org.apache.tez.dag.common.rss.RssTezUtils;
 import org.apache.tez.runtime.api.OutputContext;
@@ -131,11 +132,11 @@ public class WriteBufferManager<K, V> {
     this.maxMemSize = (long) ByteUnit.MiB.toBytes(sortmb);     // TODO: 是否需要增加系数
 
     //TezOutputContextImpl tezTaskContext = (TezOutputContextImpl) this.outputContext;
-    this.appId = outputContext.getApplicationId().toString() + "." + outputContext.getDAGAttemptNumber();
-    this.shuffleId = this.conf.getInt(RssTezConfig.RSS_ASSIGNMENT_PREFIX + "output.vertex.id", -1);
+    this.appId = RssTezUtils.constructAppId(outputContext.getApplicationId(), outputContext.getDAGAttemptNumber());
+    this.shuffleId = this.conf.getInt(RssTezConfig.RSS_ASSIGNMENT_SHUFFLE_ID, -1);
     //assert vertexId != -1;
     if (shuffleId == -1) {
-      throw new IOException("Config " + RssTezConfig.RSS_ASSIGNMENT_PREFIX + "output.vertex.id is not set!");
+      throw new IOException("Config " + RssTezConfig.RSS_ASSIGNMENT_SHUFFLE_ID + " in WriteBufferManager is not set!");
     }
     this.numTasks = outputContext.getVertexParallelism();       // TODO: check it!!! 检查这个是实际运行task的并行度，还是写分区的个数?????
 
