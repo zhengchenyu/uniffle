@@ -16,6 +16,7 @@ import org.apache.tez.common.TezUtilsInternal;
 import org.apache.tez.common.counters.TaskCounter;
 import org.apache.tez.common.counters.TezCounter;
 import org.apache.tez.dag.api.TezException;
+import org.apache.tez.dag.api.TezUncheckedException;
 import org.apache.tez.dag.common.rss.RssTezConfig;
 import org.apache.tez.dag.common.rss.RssTezUtils;
 import org.apache.tez.runtime.api.Event;
@@ -23,7 +24,8 @@ import org.apache.tez.runtime.api.InputContext;
 import org.apache.tez.runtime.api.TaskFailureType;
 import org.apache.tez.runtime.library.api.TezRuntimeConfiguration;
 import org.apache.tez.runtime.library.common.ConfigUtils;
-import org.apache.tez.runtime.library.common.shuffle.OrderedShufflePlugin;
+import org.apache.tez.runtime.library.common.shuffle.FetchedInput;
+import org.apache.tez.runtime.library.common.shuffle.ShufflePlugin;
 import org.apache.tez.runtime.library.common.shuffle.ShuffleUtils;
 import org.apache.tez.runtime.library.common.shuffle.orderedgrouped.ExceptionReporter;
 import org.apache.tez.runtime.library.common.TezRuntimeUtils;
@@ -44,7 +46,7 @@ import java.util.concurrent.Executors;
 import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.concurrent.atomic.AtomicReference;
 
-public class RssShuffle implements OrderedShufflePlugin, ExceptionReporter {
+public class RssShuffle implements ShufflePlugin, ExceptionReporter {
 
   private static final Logger LOG = LoggerFactory.getLogger(Shuffle.class);
 
@@ -149,13 +151,14 @@ public class RssShuffle implements OrderedShufflePlugin, ExceptionReporter {
 
 
 
-  public RssShuffle(InputContext context, Configuration conf, int numInputs,
+  public RssShuffle(InputContext context, Configuration conf, int numInputs, CompressionCodec codec,
                     long initialMemoryAvailable) throws IOException {
     this.context = context;
     this.conf = conf;
     // Ignore numInputs. For auto reduce mode, this is number of task multiply partition count.
     // But in rss mode, numInputs should be partition count.
     this.numInputs = numInputs;
+    this.codec = codec;
     this.initialMemoryAvailable = initialMemoryAvailable;
 
     this.appId = RssTezUtils.constructAppId(context.getApplicationId(), context.getDAGAttemptNumber());
@@ -289,6 +292,18 @@ public class RssShuffle implements OrderedShufflePlugin, ExceptionReporter {
       runShuffleFuture.cancel(true);
       cleanupIgnoreErrors();
     }
+  }
+
+  @Override
+  public FetchedInput getNextInput() throws InterruptedException {
+    throw new TezUncheckedException("getNextInput is not implemented.");
+
+  }
+
+  @Override
+  public float getProgress(float v, float v1) {
+    throw new TezUncheckedException("getProgress is not implemented.");
+
   }
 
   private void cleanupIgnoreErrors() {
