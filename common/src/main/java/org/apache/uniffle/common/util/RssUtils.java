@@ -288,11 +288,12 @@ public class RssUtils {
     }
   }
   
-  public static Roaring64NavigableMap generateTaskIdBitMap(Roaring64NavigableMap blockIdBitmap, IdHelper idHelper) {
+  public static Roaring64NavigableMap generateTaskIdBitMap(Roaring64NavigableMap blockIdBitmap, IdHelper idHelper,
+                                                           long shuffleId) {
     Iterator<Long> iterator = blockIdBitmap.iterator();
     Roaring64NavigableMap taskIdBitmap = Roaring64NavigableMap.bitmapOf();
     while (iterator.hasNext()) {
-      taskIdBitmap.addLong(idHelper.getTaskAttemptId(iterator.next()));
+      taskIdBitmap.addLong(idHelper.getTaskAttemptId(iterator.next(), shuffleId));
     }
     return taskIdBitmap;
   }

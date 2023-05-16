@@ -29,11 +29,11 @@ public final class Constants {
   // BlockId is long and consist of partitionId, taskAttemptId, atomicInt
   // the length of them are ATOMIC_INT_MAX_LENGTH + PARTITION_ID_MAX_LENGTH + TASK_ATTEMPT_ID_MAX_LENGTH = 63
   public static final int PARTITION_ID_MAX_LENGTH = 24;
-  public static final int TASK_ATTEMPT_ID_MAX_LENGTH = 21;
+  public static final int TASK_ATTEMPT_ID_MAX_LENGTH = 21;      // 这个名字应该叫task_id，而不是task_attempid
   public static final int ATOMIC_INT_MAX_LENGTH = 18;
   public static final long MAX_SEQUENCE_NO = (1 << Constants.ATOMIC_INT_MAX_LENGTH) - 1;
   public static final long MAX_PARTITION_ID = (1 << Constants.PARTITION_ID_MAX_LENGTH) - 1;
-  public static final long MAX_TASK_ATTEMPT_ID = (1 << Constants.TASK_ATTEMPT_ID_MAX_LENGTH) - 1;
+  public static final long MAX_TASK_ATTEMPT_ID = (1 << Constants.TASK_ATTEMPT_ID_MAX_LENGTH) - 1;           // 这个名字应该叫task_id，而不是task_attempid
   public static final long INVALID_BLOCK_ID = -1L;
   public static final String KEY_SPLIT_CHAR = "/";
   public static final String COMMA_SPLIT_CHAR = ",";

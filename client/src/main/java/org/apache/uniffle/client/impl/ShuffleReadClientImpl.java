@@ -109,7 +109,7 @@ public class ShuffleReadClientImpl implements ShuffleReadClient {
 
     List<Long> removeBlockIds = Lists.newArrayList();
     blockIdBitmap.forEach(bid -> {
-      if (!taskIdBitmap.contains(idHelper.getTaskAttemptId(bid))) {
+      if (!taskIdBitmap.contains(idHelper.getTaskAttemptId(bid, shuffleId))) {
         removeBlockIds.add(bid);
       }
     });
@@ -210,6 +210,8 @@ public class ShuffleReadClientImpl implements ShuffleReadClient {
         pendingBlockIds.removeLong(bs.getBlockId());
         // only update the statistics of necessary blocks
         clientReadHandler.updateConsumedBlockInfo(bs, false);
+        LOG.info("ShuffleReadImpl::readShuffleBlockData id = {} processedBlockIds = {}, pendingBlockIds = {}, blockIdBitmap = {}," +
+            " taskIdBitmap = {}", shuffleId + "." + partitionId, processedBlockIds, pendingBlockIds, blockIdBitmap, taskIdBitmap);
         break;
       }
       clientReadHandler.updateConsumedBlockInfo(bs, true);

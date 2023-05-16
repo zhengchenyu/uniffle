@@ -8,6 +8,7 @@ import org.apache.tez.runtime.api.OutputContext;
 import org.apache.uniffle.client.api.ShuffleWriteClient;
 import org.apache.uniffle.client.factory.ShuffleClientFactory;
 import org.apache.uniffle.common.ShuffleServerInfo;
+import org.apache.uniffle.common.config.RssConf;
 import org.apache.uniffle.common.exception.RssException;
 import org.apache.uniffle.common.util.Constants;
 import org.slf4j.Logger;
@@ -25,6 +26,11 @@ public class RssTezUtils {
   private static final String APP_ATTEMPT_ID_PREFIX = appAttemptIdStrPrefix + '_';
   private static final int ATTEMPT_ID_MIN_DIGITS = 6;
   private static final int APP_ID_MIN_DIGITS = 4;
+
+  private static final int MAX_ATTEMPT_LENGTH = 6;
+  private static final long MAX_ATTEMPT_ID = (1 << MAX_ATTEMPT_LENGTH) - 1;
+  private final static int VERTEX_ID_MAX_LENGTH = Constants.PARTITION_ID_MAX_LENGTH;
+  public static final long MAX_VERTEX_ID = Constants.MAX_PARTITION_ID;
 
   public static ShuffleWriteClient createShuffleClient(Configuration conf) {
     int heartBeatThreadNum = conf.getInt(RssTezConfig.RSS_CLIENT_HEARTBEAT_THREAD_NUM,
@@ -150,87 +156,64 @@ public class RssTezUtils {
     }
   }
 
-  private static final int MAX_ATTEMPT_LENGTH = 6;
-  private static final long MAX_ATTEMPT_ID = (1 << MAX_ATTEMPT_LENGTH) - 1;
-
-  // TODO: getBlockId 和convertTaskAttemptIdToLong进行统一。考虑是否可以与MR中的统一。全局的taskattemptid需要重新命令，因为包括了vertexid, taskid, taskattemptid
-  public static long getBlockId(long partitionId, OutputContext context, int nextSeqNo) {
+  public static long getBlockId(OutputContext context, long partitionId, int nextSeqNo) {
     long attemptId = context.getTaskAttemptNumber();
     if (attemptId < 0 || attemptId > MAX_ATTEMPT_ID) {
-      throw new RssException("Can't support attemptId [" + attemptId
-        + "], the max value should be " + MAX_ATTEMPT_ID);
+      throw new RssException("Can't support attemptId [" + attemptId + "], the max value should be " + MAX_ATTEMPT_ID);
     }
-    long  atomicInt = (nextSeqNo << MAX_ATTEMPT_LENGTH) + attemptId;
+    long atomicInt = (nextSeqNo << MAX_ATTEMPT_LENGTH) + attemptId;
     if (atomicInt < 0 || atomicInt > Constants.MAX_SEQUENCE_NO) {
-      throw new RssException("Can't support sequence [" + atomicInt
-        + "], the max value should be " + Constants.MAX_SEQUENCE_NO);
+      throw new RssException(
+          "Can't support sequence [" + atomicInt + "], the max value should be " + Constants.MAX_SEQUENCE_NO);
     }
     if (partitionId < 0 || partitionId > Constants.MAX_PARTITION_ID) {
-      throw new RssException("Can't support partitionId["
-        + partitionId + "], the max value should be " + Constants.MAX_PARTITION_ID);
+      throw new RssException(
+          "Can't support partitionId[" + partitionId + "], the max value should be " + Constants.MAX_PARTITION_ID);
     }
     long taskId = context.getTaskIndex();
     if (taskId < 0 ||  taskId > Constants.MAX_TASK_ATTEMPT_ID) {
-      throw new RssException("Can't support taskId["
-        + taskId + "], the max value should be " + Constants.MAX_TASK_ATTEMPT_ID);
+      throw new RssException(
+          "Can't support taskId[" + taskId + "], the max value should be " + Constants.MAX_TASK_ATTEMPT_ID);
     }
     return (atomicInt << (Constants.PARTITION_ID_MAX_LENGTH + Constants.TASK_ATTEMPT_ID_MAX_LENGTH))
       + (partitionId << Constants.TASK_ATTEMPT_ID_MAX_LENGTH) + taskId;
   }
 
-  private final static int TASK_ATTEMPT_ID_MAX_LENGTH = 8;
-  private final static int TASK_ID_MAX_LENGTH = 32;
-  private final static int VERTEX_ID_MAX_LENGTH = 16;
+  public static long convertTaskAttemptIdToLong(long shuffleId, long taskId, long taskAttemptId) {
+    if (shuffleId > MAX_VERTEX_ID) {
+      throw new RssException("Vertex " + shuffleId +  " exceed");
+    }
+    if (taskId > 1000) {
+      throw new RssException("Task " + taskId +  " exceed");
+    }
+    if (taskAttemptId > 10000) {
+      throw new RssException("TaskAttempt " + shuffleId +  " exceed");
+    }
+    return (shuffleId << (16 + 32)) + (taskId << 16) + taskAttemptId;
+  }
 
-  public static final long MAX_TASK_ATTEMPT_ID = (1l << TASK_ATTEMPT_ID_MAX_LENGTH) - 1;
-  public static final long MAX_TASK_ID = (1l << TASK_ID_MAX_LENGTH) - 1;
-  public static final long MAX_VERTEX_ID = (1l << VERTEX_ID_MAX_LENGTH) - 1;
+  public static long getTaskAttemptId(long blockId, long shuffleId) {
+    long taskId = blockId & Constants.MAX_TASK_ATTEMPT_ID;
+    long attemptId = (blockId >> (Constants.TASK_ATTEMPT_ID_MAX_LENGTH + Constants.PARTITION_ID_MAX_LENGTH))
+        & MAX_ATTEMPT_ID;
+    return convertTaskAttemptIdToLong(shuffleId, taskId, attemptId);
+  }
 
+  /*
   public static long convertTaskAttemptIdToLong(int vertexId, int taskId, int taskAttemptId) {
     if (vertexId > MAX_VERTEX_ID) {
       throw new RssException("Vertex " + vertexId +  " exceed");
     }
-    if (taskId > MAX_TASK_ID) {
+    if (taskId > Constants.MAX_TASK_ATTEMPT_ID) {
       throw new RssException("Task " + taskId +  " exceed");
     }
-    if (taskAttemptId > MAX_TASK_ATTEMPT_ID) {
+    if (taskAttemptId > MAX_ATTEMPT_ID) {
       throw new RssException("TaskAttempt " + vertexId +  " exceed");
     }
-    return (vertexId << (MAX_TASK_ATTEMPT_ID + MAX_TASK_ID)) + taskId << MAX_TASK_ATTEMPT_ID + taskAttemptId;
+    return (taskAttemptId << (Constants.TASK_ATTEMPT_ID_MAX_LENGTH + VERTEX_ID_MAX_LENGTH)) +
+        (vertexId << Constants.TASK_ATTEMPT_ID_MAX_LENGTH) + taskId;
   }
-
-//  public static RoaringBitmap getPartitionStatsForPhysicalOutput(long[] sizes) {
-//    RoaringBitmap partitionStats = new RoaringBitmap();
-//    if (sizes == null || sizes.length == 0) {
-//      return partitionStats;
-//    }
-//    final int RANGE_LEN = DATA_RANGE_IN_MB.values().length;
-//    for (int i = 0; i < sizes.length; i++) {
-//      int bucket = DATA_RANGE_IN_MB.getRange(sizes[i]).ordinal();
-//      int index = i * (RANGE_LEN);
-//      partitionStats.add(index + bucket);
-//    }
-//    return partitionStats;
-//  }
-//
-//  @InterfaceAudience.Private
-//  public static ByteString compressByteArrayToByteString(byte[] inBytes, Deflater deflater) throws IOException {
-//    deflater.reset();
-//    ByteString.Output os = ByteString.newOutput();
-//    DeflaterOutputStream compressOs = null;
-//    try {
-//      compressOs = new DeflaterOutputStream(os, deflater);
-//      compressOs.write(inBytes);
-//      compressOs.finish();
-//      ByteString byteString = os.toByteString();
-//      return byteString;
-//    } finally {
-//      if (compressOs != null) {
-//        compressOs.close();
-//      }
-//    }
-//  }
-
+  * */
 
   public static Object getPrivateStaticField(String name, Object object) {
     try {
@@ -251,6 +234,30 @@ public class RssTezUtils {
     sb.append('_');
     FastNumberFormat.format(sb, appAttemptId, ATTEMPT_ID_MIN_DIGITS);
     return sb.toString();
+  }
+
+  public static RssConf toRssConf(Configuration tezConf) {
+    RssConf rssConf = new RssConf();
+    for (Map.Entry<String, String> entry : tezConf) {
+      String key = entry.getKey();
+      if (!key.startsWith(RssTezConfig.TEZ_RSS_CONFIG_PREFIX)) {
+        continue;
+      }
+      key = key.substring(RssTezConfig.TEZ_RSS_CONFIG_PREFIX.length());
+      rssConf.setString(key, entry.getValue());
+    }
+    return rssConf;
+  }
+
+  public static Configuration filterRssConf(Configuration extraConf) {
+    Configuration conf = new Configuration();
+    for (Map.Entry<String, String> entry : extraConf) {
+      String key = entry.getKey();
+      if (key.startsWith(RssTezConfig.TEZ_RSS_CONFIG_PREFIX)) {
+        conf.set(entry.getKey(), entry.getValue());
+      }
+    }
+    return conf;
   }
 
 }

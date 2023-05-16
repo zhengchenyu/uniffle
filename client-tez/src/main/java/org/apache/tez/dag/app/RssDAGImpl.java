@@ -9,6 +9,7 @@ import org.apache.commons.lang3.StringUtils;
 import org.apache.hadoop.conf.Configuration;
 import org.apache.hadoop.security.Credentials;
 import org.apache.hadoop.yarn.event.EventHandler;
+import org.apache.hadoop.yarn.state.InvalidStateTransitonException;
 import org.apache.hadoop.yarn.util.Clock;
 import org.apache.tez.common.TezUtils;
 import org.apache.tez.dag.api.TezConfiguration;
@@ -224,7 +225,7 @@ public class RssDAGImpl extends DAGImpl {
 
                 // Inform the shuffle server information and rss config to output and input
                 try {
-                  Configuration filteredExtraConf = RssTezConfig.filterRssConf(extraConf);
+                  Configuration filteredExtraConf = RssTezUtils.filterRssConf(extraConf);
 
                   Configuration edgeSourceConf =
                       TezUtils.createConfFromUserPayload(edge.getEdgeProperty().getEdgeSource().getUserPayload());
@@ -253,8 +254,10 @@ public class RssDAGImpl extends DAGImpl {
           }
         }
 
-        long heartbeatInterval = amConf.getLong(RssTezConfig.RSS_HEARTBEAT_INTERVAL,
-          RssTezConfig.RSS_HEARTBEAT_INTERVAL_DEFAULT_VALUE);
+//        long heartbeatInterval = amConf.getLong(RssTezConfig.RSS_HEARTBEAT_INTERVAL,
+//          RssTezConfig.RSS_HEARTBEAT_INTERVAL_DEFAULT_VALUE);
+        long heartbeatInterval = amConf.getLong(RssTezConfig.RSS_HEARTBEAT_INTERVAL, 100000);   // TODO: this is test, change it later...
+
         long heartbeatTimeout = amConf.getLong(RssTezConfig.RSS_HEARTBEAT_TIMEOUT, heartbeatInterval / 2);
         client.registerApplicationInfo(appId, heartbeatTimeout, "user");
 

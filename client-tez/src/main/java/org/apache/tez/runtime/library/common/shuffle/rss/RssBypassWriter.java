@@ -24,6 +24,7 @@ public class RssBypassWriter {
       throw new IllegalStateException("RSS does not support OnDiskMapOutput as shuffle ouput,"
         + " try to reduce mapreduce.reduce.shuffle.memory.limit.percent");
     } else {
+      // TODO: 支持WaitMapOutput
       throw new IllegalStateException("Merger reserve unknown type of MapOutput: "
         + mapOutput.getClass().getCanonicalName());
     }

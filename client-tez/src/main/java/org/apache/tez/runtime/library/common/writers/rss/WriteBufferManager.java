@@ -119,7 +119,7 @@ public class WriteBufferManager<K, V> {
     this.outputContext = outputContext;
     // conf include extraConf from RssDagAppMaster
     this.conf = conf;
-    this.rssConf = RssTezConfig.toRssConf(this.conf);
+    this.rssConf = RssTezUtils.toRssConf(this.conf);
     this.sort = sort;
     this.numPartitions = numPartitions;
     this.partitionToServers = partitionToServers;
@@ -274,12 +274,6 @@ public class WriteBufferManager<K, V> {
       sendBuffersToServers();
     }
     long start = System.currentTimeMillis();
-    long commitDuration = 0;
-    if (!isMemoryShuffleEnabled) {
-      long s = System.currentTimeMillis();
-      sendCommit();
-      commitDuration = System.currentTimeMillis() - s;
-    }
     while (true) {
       // if failed when send data to shuffle server, mark task as failed
       if (failedBlockIds.size() > 0) {
@@ -308,7 +302,13 @@ public class WriteBufferManager<K, V> {
 
     start = System.currentTimeMillis();
     shuffleWriteClient.reportShuffleResult(partitionToServers, appId, shuffleId,
-      taskAttemptId, partitionToBlocks, bitmapSplitNum);
+      taskAttemptId, partitionToBlocks, bitmapSplitNum);      // TODO: reportShuffleResult and finishShuffle的顺序. finishShuffle竟然跑到了reportShuffleResult 之后了。
+    long commitDuration = 0;
+    if (!isMemoryShuffleEnabled) {
+      long s = System.currentTimeMillis();
+      sendCommit();
+      commitDuration = System.currentTimeMillis() - s;
+    }
     LOG.info("Report shuffle result for task[{}] with bitmapNum[{}] cost {} ms",
       taskAttemptId, bitmapSplitNum, (System.currentTimeMillis() - start));
     LOG.info("Task uncompressed data length {} compress time cost {} ms, commit time cost {} ms,"
@@ -364,7 +364,8 @@ public class WriteBufferManager<K, V> {
     final byte[] compressed = codec.compress(data);
     final long crc32 = ChecksumUtils.getCrc32(compressed);
     compressTime += System.currentTimeMillis() - start;
-    final long blockId = RssTezUtils.getBlockId(partitionId, outputContext, getNextSeqNo(partitionId));
+    final long blockId = RssTezUtils.getBlockId(outputContext, partitionId, getNextSeqNo(partitionId));
+    LOG.info("?????? {}, blockid is {}", outputContext.getTaskVertexName(), blockId);
     uncompressedDataLen += data.length;
     // add memory to indicate bytes which will be sent to shuffle server
     inSendListBytes.addAndGet(wb.getDataLength());

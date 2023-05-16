@@ -163,29 +163,4 @@ public class RssTezConfig {
   public static final String RSS_ASSIGNMENT_SHUFFLE_ID = RssTezConfig.RSS_ASSIGNMENT_PREFIX + "output.vertex.id";
   public static final String RSS_ASSIGNMENT_NUM_PARTITIONS = RssTezConfig.RSS_ASSIGNMENT_PREFIX + "number.partitions";
 
-
-  public static RssConf toRssConf(Configuration tezConf) {
-    RssConf rssConf = new RssConf();
-    for (Map.Entry<String, String> entry : tezConf) {
-      String key = entry.getKey();
-      if (!key.startsWith(TEZ_RSS_CONFIG_PREFIX)) {
-        continue;
-      }
-      key = key.substring(TEZ_RSS_CONFIG_PREFIX.length());
-      rssConf.setString(key, entry.getValue());
-    }
-    return rssConf;
-  }
-
-  public static Configuration filterRssConf(Configuration extraConf) {
-    Configuration conf = new Configuration();
-    for (Map.Entry<String, String> entry : extraConf) {
-      String key = entry.getKey();
-      if (key.startsWith(TEZ_RSS_CONFIG_PREFIX)) {
-        conf.set(entry.getKey(), entry.getValue());
-      }
-    }
-    return conf;
-  }
-
 }

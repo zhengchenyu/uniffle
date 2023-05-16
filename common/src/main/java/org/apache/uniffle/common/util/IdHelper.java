@@ -19,5 +19,5 @@ package org.apache.uniffle.common.util;
 
 public interface IdHelper {
 
-  long getTaskAttemptId(long blockId);
+  long getTaskAttemptId(long blockId, long shuffleId);
 }

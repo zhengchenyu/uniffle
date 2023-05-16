@@ -270,7 +270,7 @@ public class ShuffleServerWithLocalOfLocalOrderTest extends ShuffleReadWriteBase
         .collect(Collectors.toMap(x -> x.getKey(), x -> x.getValue()));
     taskIds = Roaring64NavigableMap.bitmapOf();
     for (long blockId : expectedBlockIds4) {
-      taskIds.add(new DefaultIdHelper().getTaskAttemptId(blockId));
+      taskIds.add(new DefaultIdHelper().getTaskAttemptId(blockId, -1));
     }
     sdr  = readShuffleData(
         shuffleServerClient,

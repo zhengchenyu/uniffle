@@ -45,6 +45,7 @@ public class RssMRUtils {
   // Class TaskAttemptId have two field id and mapId, rss taskAttemptID have 21 bits,
   // mapId is 19 bits, id is 2 bits. MR have a trick logic, taskAttemptId will increase
   // 1000 * (appAttemptId - 1), so we will decrease it.
+  // taskattemptid =  高位是taskattempid,其中最低6为是taskattemptid  -- 中间paritiontid空着24 --- taskid 低21,
   public static long convertTaskAttemptIdToLong(TaskAttemptID taskAttemptID, int appAttemptId) {
     long lowBytes = taskAttemptID.getTaskID().getId();
     if (lowBytes > Constants.MAX_TASK_ATTEMPT_ID) {
@@ -167,6 +168,7 @@ public class RssMRUtils {
     return rssJobConf.get(key, mrJobConf.get(key, defaultValue));
   }
 
+  // blockid = seqno + 6位的attemptid + 中间24位为partition + 低21位 taskid
   public static long getBlockId(long partitionId, long taskAttemptId, int nextSeqNo) {
     long attemptId = taskAttemptId >> (Constants.PARTITION_ID_MAX_LENGTH + Constants.TASK_ATTEMPT_ID_MAX_LENGTH);
     if (attemptId < 0 || attemptId > MAX_ATTEMPT_ID) {

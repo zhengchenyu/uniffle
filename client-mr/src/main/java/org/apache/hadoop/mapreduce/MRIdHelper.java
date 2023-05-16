@@ -22,7 +22,7 @@ import org.apache.uniffle.common.util.IdHelper;
 public class MRIdHelper implements IdHelper {
 
   @Override
-  public long getTaskAttemptId(long blockId) {
+  public long getTaskAttemptId(long blockId, long shuffleId) {
     return RssMRUtils.getTaskAttemptId(blockId);
   }
 }

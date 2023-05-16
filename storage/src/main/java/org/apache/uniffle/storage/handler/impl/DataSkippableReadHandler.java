@@ -69,6 +69,7 @@ public abstract class DataSkippableReadHandler extends AbstractClientReadHandler
     if (shuffleDataSegments.isEmpty()) {
       ShuffleIndexResult shuffleIndexResult = readShuffleIndex();
       if (shuffleIndexResult == null || shuffleIndexResult.isEmpty()) {
+        LOG.info("shuffleIndexResult is null id is " + this.shuffleId + "." + this.partitionId);
         return null;
       }
 
@@ -79,9 +80,13 @@ public abstract class DataSkippableReadHandler extends AbstractClientReadHandler
               .split(shuffleIndexResult);
     }
 
+    LOG.info("readShuffleData meta id is " + this.shuffleId + "." + this.partitionId
+        + "，shuffleDataSegments.size = " + shuffleDataSegments.size() + ", segmentIndex is " + this.segmentIndex);
+
     // We should skip unexpected and processed segments when handler is read
     ShuffleDataResult result = null;
     while (segmentIndex < shuffleDataSegments.size()) {
+      LOG.info("loop in segmentIndex < shuffleDataSegments, id is " + + this.shuffleId + "." + this.partitionId);
       ShuffleDataSegment segment = shuffleDataSegments.get(segmentIndex);
       Roaring64NavigableMap blocksOfSegment = Roaring64NavigableMap.bitmapOf();
       segment.getBufferSegments().forEach(block -> blocksOfSegment.addLong(block.getBlockId()));
@@ -93,9 +98,15 @@ public abstract class DataSkippableReadHandler extends AbstractClientReadHandler
         blocksOfSegment.xor(processBlockIds);
         if (!blocksOfSegment.isEmpty()) {
           result = readShuffleData(segment);
+          LOG.info("readShuffleData data id is " + this.shuffleId + "." + this.partitionId + "，result.data.size = "
+              + result.getData().length + ", result.buffersegments.size = " + result.getBufferSegments().size());
           segmentIndex++;
           break;
+        } else {
+          LOG.info("local readShuffleData inner blocksOfSegment is empty, id is " + + this.shuffleId + "." + this.partitionId);
         }
+      } else {
+        LOG.info("local readShuffleData outer blocksOfSegment is empty, id is " + + this.shuffleId + "." + this.partitionId);
       }
       segmentIndex++;
     }

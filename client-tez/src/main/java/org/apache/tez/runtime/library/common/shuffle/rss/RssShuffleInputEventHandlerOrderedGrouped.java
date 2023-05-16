@@ -117,6 +117,8 @@ public class RssShuffleInputEventHandlerOrderedGrouped implements ShuffleEventHa
     }
 
     long taskAttemptId = Long.parseLong((String) shufflePayload.get("path_component"));
+    LOG.info("!!!!!!!!!!!!!!!!vertex = {}, taskAttemptId is {}", this.inputContext.getTaskVertexIndex(), taskAttemptId);
+
     scheduler.addKnownInput(partitionId, srcAttemptIdentifier, taskAttemptId);
   }
 

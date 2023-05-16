@@ -15,6 +15,7 @@ import org.apache.tez.common.counters.TezCounter;
 import org.apache.tez.dag.api.TezUncheckedException;
 import org.apache.tez.dag.common.rss.RssTezConfig;
 import org.apache.tez.dag.common.rss.RssTezUtils;
+import org.apache.tez.dag.common.rss.TezIDHelper;
 import org.apache.tez.runtime.api.InputContext;
 import org.apache.tez.runtime.library.api.TezRuntimeConfiguration;
 import org.apache.tez.runtime.library.common.shuffle.orderedgrouped.ExceptionReporter;
@@ -299,6 +300,8 @@ public class RssShuffleScheduler<K, V> {
     for (long id : succeedTaskIds) {
       taskIdBitmap.addLong(id);
     }
+    LOG.info("!!!!!!!!!!!!!!!!vertex = {}, taskAttemptId is {}", this.inputContext.getTaskVertexIndex() ,taskIdBitmap.toString());
+
     return taskIdBitmap;
   }
 
@@ -353,6 +356,7 @@ public class RssShuffleScheduler<K, V> {
         if (LOG.isDebugEnabled()) {
           LOG.debug(srcNameTrimmed + ": " + "NumCompletedInputs: {}" + (numInputs - remainingInputs.get()));
         }
+        LOG.info(srcNameTrimmed + ": " + "NumCompletedInputs: {}" + (numInputs - remainingInputs.get()));
 
         // Ensure there's memory available before scheduling the next Fetcher.
         try {
@@ -505,6 +509,7 @@ public class RssShuffleScheduler<K, V> {
     ShuffleWriteClient writeClient = RssTezUtils.createShuffleClient(conf);
     Roaring64NavigableMap blockIdBitmap = writeClient.getShuffleResult(
       "", getAssignedServers(partitionId), appId, shuffleId, partitionId);
+    LOG.info("?????? {}, blockIdBitmap is {}", inputContext.getTaskVertexName(), blockIdBitmap.toString());
     writeClient.close();
 
     // get map-completion events to generate RSS taskIDs
@@ -521,10 +526,10 @@ public class RssShuffleScheduler<K, V> {
       CreateShuffleReadClientRequest request = new CreateShuffleReadClientRequest(
         appId, shuffleId, partitionId, storageType, basePath, indexReadLimit, readBufferSize,
         /* partitionNumPerRange 固定为1就好，因为上还有写是一次写一个partition*/ 1, this.numPartitions, blockIdBitmap, taskIdBitmap, new ArrayList<>(getAssignedServers(partitionId)),
-        readerConf, new MRIdHelper(), expectedTaskIdsBitmapFilterEnable);
+        readerConf, new TezIDHelper(), expectedTaskIdsBitmapFilterEnable);
       ShuffleReadClient shuffleReadClient = ShuffleClientFactory.getInstance().createShuffleReadClient(request);
-      RssFetcherOrderedGrouped fetcher = new RssFetcherOrderedGrouped(conf, inputContext, partitionInput,  this.merger, this, null /*progress*/, this.codec,
-        shuffleReadClient, blockIdBitmap.getLongCardinality(), RssTezConfig.toRssConf(this.conf), ifileReadAhead, ifileReadAheadLength);
+      RssFetcherOrderedGrouped fetcher = new RssFetcherOrderedGrouped(conf, inputContext, partitionInput, this.merger, this, null /*progress*/, this.codec,
+        shuffleReadClient, blockIdBitmap.getLongCardinality(), RssTezUtils.toRssConf(this.conf), ifileReadAhead, ifileReadAheadLength);
       // fetcher.fetchAllRssBlocks();
       LOG.info("In vertex-" + inputContext.getTaskVertexName() + "-" + inputContext.getTaskIndex()
         + ", Rss MR client fetches blocks from RSS server successfully");

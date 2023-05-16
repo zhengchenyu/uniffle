@@ -149,7 +149,6 @@ public class RssFetcherOrderedGrouped extends CallableWithNdc<Void> {
 //        // Do shuffle
 //        metrics.threadBusy();
         copyFromRssServer();
-        scheduler.copySucceeded(null);      // TODO: add more information
       } finally {
         // TODO: 做一些统计信息
 //        metrics.threadFree();
@@ -218,6 +217,7 @@ public class RssFetcherOrderedGrouped extends CallableWithNdc<Void> {
         + decompressTime + " ms to decompress with unCompressionLength["
         + unCompressionLength + "] and " + serializeTime + " ms to serialize and "
         + waitTime + " ms to wait resource");
+      scheduler.copySucceeded(null);
       stopFetch();
     }
   }

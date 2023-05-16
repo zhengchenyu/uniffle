@@ -82,7 +82,7 @@ public class ClientUtilsTest {
       }
 
     }
-    Roaring64NavigableMap taskIdBitMap = RssUtils.generateTaskIdBitMap(blockIdMap, new DefaultIdHelper());
+    Roaring64NavigableMap taskIdBitMap = RssUtils.generateTaskIdBitMap(blockIdMap, new DefaultIdHelper(), -1);
     assertEquals(taskSize, taskIdBitMap.getLongCardinality());
     LongIterator longIterator = taskIdBitMap.getLongIterator();
     for (int i = 0; i < taskSize; i++) {

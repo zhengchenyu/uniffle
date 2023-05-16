@@ -102,14 +102,26 @@ public class ComposedClientReadHandler extends AbstractClientReadHandler {
     } catch (RssFetchFailedException e) {
       Throwable cause = e.getCause();
       String message = "Failed to read shuffle data from " + currentTier.name() + "handler, error: " + e.getMessage();
+      LOG.info(message + ", caused by {}", e);
       throw new RssFetchFailedException(message, cause);
     } catch (Exception e) {
+      LOG.info("Failed to read shuffle data caused by", e);
       throw new RssFetchFailedException("Failed to read shuffle data from " + currentTier.name() + " handler", e);
     }
     // when is no data for current handler, and the upmostLevel is not reached,
     // then try next one if there has
     if (shuffleDataResult == null || shuffleDataResult.isEmpty()) {
+      LOG.info(
+          "wrong read increase currentTier, shuffle DataResult.data is {}, shuffle DataResult.getBufferSegments is {}, , this is {}, thread is {}, currentTier is {}, shuffleId is {}, partitionId is {}",
+          shuffleDataResult == null ? "shuffleDataResultnull" : shuffleDataResult.getData() == null ? "null" : shuffleDataResult.getData(),
+          shuffleDataResult == null ? "shuffleDataResultnull" : shuffleDataResult.getBufferSegments() == null ? "null" : shuffleDataResult.getBufferSegments().size(),
+          this, Thread.currentThread().getName(), currentTier.ordinal(),
+          ((AbstractClientReadHandler) handler).shuffleId, ((AbstractClientReadHandler) handler).partitionId);
       if (currentTier.ordinal() + 1 < numTiers) {
+        LOG.info(
+            "increase currentTier, this is {}, thread is {}, currentTier is {}, shuffleId is {}, partitionId is {}",
+            this, Thread.currentThread().getName(), currentTier.ordinal(),
+            ((AbstractClientReadHandler) handler).shuffleId, ((AbstractClientReadHandler) handler).partitionId);
         currentTier = currentTier.next();
       } else {
         return null;

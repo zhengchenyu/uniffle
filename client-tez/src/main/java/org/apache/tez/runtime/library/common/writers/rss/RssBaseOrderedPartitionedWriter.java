@@ -118,6 +118,8 @@ public class RssBaseOrderedPartitionedWriter extends KeyValuesWriter {
     // getTaskVertexIndex是vertexid, getTaskIndex是taskid, getTaskAttemptNumber是task的attemptid
     this.taskAttemptId = RssTezUtils.convertTaskAttemptIdToLong(
       this.outputContext.getTaskVertexIndex(), this.outputContext.getTaskIndex(), this.outputContext.getTaskAttemptNumber());
+    LOG.info("!!!!!!!!!!!!!!!!vertex = {}, vertexid = {}, unique task attempt id is {}",
+        this.outputContext.getTaskVertexName(), this.outputContext.getTaskVertexIndex(), taskAttemptId);
     this.bufferManager = new WriteBufferManager(this.outputContext, this.conf, true, numPartitions, taskAttemptId, partitionToServers);
 
 //    this.finalMergeEnabled = conf.getBoolean(

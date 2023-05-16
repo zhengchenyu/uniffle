@@ -114,6 +114,8 @@ public class LocalFileClientReadHandler extends DataSkippableReadHandler {
       RssGetShuffleDataResponse response = shuffleServerClient.getShuffleData(request);
       result = new ShuffleDataResult(response.getShuffleData(), shuffleDataSegment.getBufferSegments());
     } catch (Exception e) {
+      LOG.info("Failed to read shuffle data with, thread name is " + Thread.currentThread().getName() + ", id is " +
+          this.shuffleId + "." + this.partitionId + ", caused by ", e);
       throw new RssException("Failed to read shuffle data with "
           + shuffleServerClient.getClientInfo() + " due to " + e.getMessage());
     }
