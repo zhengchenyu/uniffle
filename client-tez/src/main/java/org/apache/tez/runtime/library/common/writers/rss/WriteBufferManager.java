@@ -4,6 +4,7 @@ import com.google.common.collect.Lists;
 import com.google.common.collect.Maps;
 import com.google.common.collect.Sets;
 import com.google.common.util.concurrent.Uninterruptibles;
+import java.util.concurrent.atomic.AtomicInteger;
 import org.apache.commons.lang3.StringUtils;
 import org.apache.hadoop.conf.Configuration;
 import org.apache.hadoop.io.RawComparator;
@@ -102,7 +103,6 @@ public class WriteBufferManager<K, V> {
 
   private Set<Long> successBlockIds = Sets.newConcurrentHashSet();
   private Set<Long> failedBlockIds = Sets.newConcurrentHashSet();
-
 
   // Counter
   private long copyTime = 0;
@@ -268,7 +268,6 @@ public class WriteBufferManager<K, V> {
     sendExecutorService.shutdownNow();
   }
 
-
   public void waitSendFinished() {
     while (!waitSendBuffers.isEmpty()) {
       sendBuffersToServers();
@@ -299,16 +298,16 @@ public class WriteBufferManager<K, V> {
         throw new RssException(errorMsg);
       }
     }
-
-    start = System.currentTimeMillis();
-    shuffleWriteClient.reportShuffleResult(partitionToServers, appId, shuffleId,
-      taskAttemptId, partitionToBlocks, bitmapSplitNum);      // TODO: reportShuffleResult and finishShuffle的顺序. finishShuffle竟然跑到了reportShuffleResult 之后了。
     long commitDuration = 0;
     if (!isMemoryShuffleEnabled) {
       long s = System.currentTimeMillis();
       sendCommit();
       commitDuration = System.currentTimeMillis() - s;
     }
+
+    start = System.currentTimeMillis();
+    shuffleWriteClient.reportShuffleResult(partitionToServers, appId, shuffleId,
+      taskAttemptId, partitionToBlocks, bitmapSplitNum);      // TODO: reportShuffleResult and finishShuffle的顺序. finishShuffle竟然跑到了reportShuffleResult 之后了。
     LOG.info("Report shuffle result for task[{}] with bitmapNum[{}] cost {} ms",
       taskAttemptId, bitmapSplitNum, (System.currentTimeMillis() - start));
     LOG.info("Task uncompressed data length {} compress time cost {} ms, commit time cost {} ms,"

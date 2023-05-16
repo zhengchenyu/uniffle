@@ -263,7 +263,6 @@ public class SortWriteBufferManager<K, V> {
       sendBuffersToServers();
     }
     long start = System.currentTimeMillis();
-    long commitDuration = 0;
     while (true) {
       // if failed when send data to shuffle server, mark task as failed
       if (failedBlockIds.size() > 0) {
@@ -289,15 +288,16 @@ public class SortWriteBufferManager<K, V> {
         throw new RssException(errorMsg);
       }
     }
-
-    start = System.currentTimeMillis();
-    shuffleWriteClient.reportShuffleResult(partitionToServers, appId, 0,
-        taskAttemptId, partitionToBlocks, bitmapSplitNum);
+    long commitDuration = 0;
     if (!isMemoryShuffleEnabled) {
       long s = System.currentTimeMillis();
       sendCommit();
       commitDuration = System.currentTimeMillis() - s;
     }
+
+    start = System.currentTimeMillis();
+    shuffleWriteClient.reportShuffleResult(partitionToServers, appId, 0,
+        taskAttemptId, partitionToBlocks, bitmapSplitNum);
     LOG.info("Report shuffle result for task[{}] with bitmapNum[{}] cost {} ms",
         taskAttemptId, bitmapSplitNum, (System.currentTimeMillis() - start));
     LOG.info("Task uncompressed data length {} compress time cost {} ms, commit time cost {} ms,"
