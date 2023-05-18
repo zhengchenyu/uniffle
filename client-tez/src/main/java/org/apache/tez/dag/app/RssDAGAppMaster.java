@@ -22,6 +22,7 @@ import org.apache.tez.dag.api.TezConfiguration;
 import org.apache.tez.dag.api.TezConstants;
 import org.apache.tez.dag.api.records.DAGProtos;
 import org.apache.tez.dag.app.dag.impl.DAGImpl;
+import org.apache.tez.dag.app.dag.impl.RssDAGImplV2;
 import org.apache.tez.dag.common.rss.RssTezUtils;
 import org.apache.tez.dag.records.TezDAGID;
 import org.slf4j.Logger;
@@ -64,7 +65,7 @@ public class RssDAGAppMaster extends DAGAppMaster {
   DAGImpl createDAG(DAGProtos.DAGPlan dagPB, TezDAGID dagId) {
     DAGImpl dag = super.createDAG(dagPB, dagId);
     // We can't get ApplicationAttemptId from TezTaskContextImpl, so we use ApplicationId + attemptId
-    return new RssDAGImpl(dag, super.getContext().getAMConf(),
+    return new RssDAGImplV2(dag, super.getContext().getAMConf(),
         RssTezUtils.constructAppId(this.getAppID(), this.getAttemptID().getAttemptId()));
   }
 
