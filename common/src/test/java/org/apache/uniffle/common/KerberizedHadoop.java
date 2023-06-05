@@ -184,6 +184,12 @@ public class KerberizedHadoop implements Serializable {
 
     Configuration conf = new Configuration();
     conf.set(HADOOP_SECURITY_AUTHENTICATION, "kerberos");
+
+    LOGGER.info("kerberos config file is {}", krb5Conf);
+    List<String> lines = Files.readAllLines(new File(krb5Conf).toPath());
+    for (int i = 0; i < lines.size(); i++) {
+      LOGGER.info("KRB FILE line {}, content = {}", i, lines.get(i));
+    }
     
     UserGroupInformation.setConfiguration(conf);
     UserGroupInformation.setShouldRenewImmediatelyForTests(true);
