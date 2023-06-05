@@ -29,17 +29,22 @@ import org.junit.jupiter.api.BeforeAll;
 import org.junit.jupiter.api.Test;
 
 import org.apache.uniffle.common.KerberizedHadoopBase;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.junit.jupiter.api.Assertions.fail;
 
 public class HadoopSecurityContextTest extends KerberizedHadoopBase {
-
+  
+  private static final Logger LOG = LoggerFactory.getLogger(HadoopSecurityContextTest.class);
+  
   @BeforeAll
   public static void beforeAll() throws Exception {
     testRunner = HadoopSecurityContextTest.class;
     KerberizedHadoopBase.init();
+    LOG.info("KerberizedHadoopBase inited in HadoopSecurityContextTest!");
   }
 
   @Test

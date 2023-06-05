@@ -23,10 +23,15 @@ import org.apache.uniffle.common.security.HadoopSecurityContext;
 import org.apache.uniffle.common.security.NoOpSecurityContext;
 import org.apache.uniffle.common.security.SecurityConfig;
 import org.apache.uniffle.common.security.SecurityContextFactory;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 
 public class KerberizedHadoopBase {
+
+  private static final Logger LOG = LoggerFactory.getLogger(KerberizedHadoopBase.class);
+
   protected static KerberizedHadoop kerberizedHadoop;
   protected static Class<?> testRunner = KerberizedHadoopBase.class;
 
@@ -38,6 +43,7 @@ public class KerberizedHadoopBase {
 
   @AfterAll
   public static void clear() throws Exception {
+    LOG.info("kerberizedHadoop will tear down!");
     kerberizedHadoop.tearDown();
     kerberizedHadoop = null;
   }

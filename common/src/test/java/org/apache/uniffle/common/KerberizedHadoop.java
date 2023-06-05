@@ -96,12 +96,16 @@ public class KerberizedHadoop implements Serializable {
     kerberizedDfsBaseDir = Files.createTempDirectory("kerberizedDfsBaseDir").toFile().toPath();
 
     startKDC();
+    LOGGER.info("start kdc success!");
     try {
       startKerberizedDFS();
+      LOGGER.info("start kerberizeddfs success!");
     } catch (Throwable t) {
+      LOGGER.warn("start kerberizeddfs failed!");
       throw new Exception(t);
     }
     setupDFSData();
+    LOGGER.info("start dfs data success!");
   }
 
   private void setupDFSData() throws Exception {
