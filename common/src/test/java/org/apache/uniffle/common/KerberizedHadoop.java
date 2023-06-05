@@ -101,7 +101,7 @@ public class KerberizedHadoop implements Serializable {
       startKerberizedDFS();
       LOGGER.info("start kerberizeddfs success!");
     } catch (Throwable t) {
-      LOGGER.warn("start kerberizeddfs failed!");
+      LOGGER.warn("start kerberizeddfs failed!", t);
       throw new Exception(t);
     }
     setupDFSData();
@@ -171,6 +171,7 @@ public class KerberizedHadoop implements Serializable {
   }
 
   private void startKerberizedDFS() throws Throwable {
+    LOGGER.info("start kerberizeddfs 1!");
     String krb5Conf = kdc.getKrb5conf().getAbsolutePath();
     System.setProperty("java.security.krb5.conf", krb5Conf);
 
@@ -179,6 +180,7 @@ public class KerberizedHadoop implements Serializable {
     kdc.createPrincipal(keytab, principal);
     hdfsKeytab = keytab.getPath();
     hdfsPrincipal = principal + "@" + kdc.getRealm();
+    LOGGER.info("start kerberizeddfs 2!");
 
     Configuration conf = new Configuration();
     conf.set(HADOOP_SECURITY_AUTHENTICATION, "kerberos");
@@ -188,11 +190,12 @@ public class KerberizedHadoop implements Serializable {
     final UserGroupInformation ugi =
         UserGroupInformation.loginUserFromKeytabAndReturnUGI(hdfsPrincipal, hdfsKeytab);
 
+    LOGGER.info("start kerberizeddfs 3!");
     Configuration hdfsConf = createSecureDFSConfig();
     hdfsConf.set("hadoop.proxyuser.hdfs.hosts", "*");
     hdfsConf.set("hadoop.proxyuser.hdfs.groups", "*");
     hdfsConf.set("hadoop.proxyuser.hdfs.users", "*");
-
+    LOGGER.info("start kerberizeddfs 4!");
     this.kerberizedDfsCluster = RetryUtils.retry(() -> {
       List<Integer> ports = findAvailablePorts(5);
       LOGGER.info("Find available ports: {}", ports);
@@ -206,6 +209,7 @@ public class KerberizedHadoop implements Serializable {
 
         @Override
         public MiniDFSCluster run() throws Exception {
+          LOGGER.info("start kerberizeddfs 5!");
           return new MiniDFSCluster
               .Builder(hdfsConf)
               .nameNodePort(ports.get(4))
@@ -216,6 +220,7 @@ public class KerberizedHadoop implements Serializable {
         }
       });
     }, 1000L, 5, Sets.newHashSet(BindException.class));
+    LOGGER.info("start kerberizeddfs 6!");
   }
 
   private void startKDC() throws Exception {
