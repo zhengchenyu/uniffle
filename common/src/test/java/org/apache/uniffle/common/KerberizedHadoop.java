@@ -221,7 +221,7 @@ public class KerberizedHadoop implements Serializable {
       }
       c = Config.getInstance();
       LOGGER.info("kerberos Config is {}", c);
-      LOGGER.info("realm is {}", c.getDefaultRealm());
+      // LOGGER.info("realm is {}", c.getDefaultRealm());
       Method method = c.getClass().getDeclaredMethod("getProperty", String.class);
       method.setAccessible(true);
       String str = (String) method.invoke(c, "java.security.krb5.kdc");
