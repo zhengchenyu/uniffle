@@ -17,9 +17,12 @@
 
 package org.apache.uniffle.common;
 
+import java.io.BufferedReader;
 import java.io.BufferedWriter;
 import java.io.File;
+import java.io.FileInputStream;
 import java.io.IOException;
+import java.io.InputStreamReader;
 import java.io.OutputStreamWriter;
 import java.io.Serializable;
 import java.lang.reflect.Field;
@@ -30,14 +33,19 @@ import java.net.ServerSocket;
 import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
 import java.nio.file.Path;
+import java.security.AccessController;
 import java.security.CodeSource;
 import java.security.PrivilegedExceptionAction;
 import java.security.ProtectionDomain;
 import java.util.ArrayList;
+import java.util.Hashtable;
 import java.util.List;
+import java.util.Locale;
+import java.util.Map;
 import java.util.Properties;
 
 import com.google.common.collect.Sets;
+import java.util.Vector;
 import org.apache.hadoop.conf.Configuration;
 import org.apache.hadoop.fs.CommonConfigurationKeysPublic;
 import org.apache.hadoop.fs.FSDataOutputStream;
@@ -244,6 +252,14 @@ public class KerberizedHadoop implements Serializable {
       method.setAccessible(true);
       str = (String) method.invoke(c);
       LOGGER.info("the value of getJavaFileName is {}", str);
+      List<String> loadedConfigFile = loadConfigFile(str);
+      for (int i = 0; i < loadedConfigFile.size(); i++) {
+        LOGGER.info("loadedConfigFile FILE line {}, content = {}", i, lines.get(i));
+      }
+      Hashtable<String,Object> hashtable = parseStanzaTable(loadedConfigFile);
+      for (Map.Entry<String, Object> entry : hashtable.entrySet()) {
+        LOGGER.info("hashtable key = {}, value = {}", entry.getKey(), entry.getValue());
+      }
       lines = Files.readAllLines(new File(str).toPath());
       for (int i = 0; i < lines.size(); i++) {
         LOGGER.info("JAVA FILE line {}, content = {}", i, lines.get(i));
@@ -255,11 +271,12 @@ public class KerberizedHadoop implements Serializable {
       method = c.getClass().getDeclaredMethod("useDNS_Realm");
       method.setAccessible(true);
       LOGGER.info("useDNS_Realm is {}", (boolean) method.invoke(c));
-      method = c.getClass().getDeclaredMethod("getRealmFromDNS");
-      method.setAccessible(true);
-      String realmFromDNS = (String) method.invoke(c);
-      LOGGER.info("realmFromDNS is {}", realmFromDNS == null ? "null" : realmFromDNS);
+//      method = c.getClass().getDeclaredMethod("getRealmFromDNS");
+//      method.setAccessible(true);
+//      String realmFromDNS = (String) method.invoke(c);
+//      LOGGER.info("realmFromDNS is {}", realmFromDNS == null ? "null" : realmFromDNS);
       LOGGER.info("hostname is {}", InetAddress.getLocalHost().getCanonicalHostName());
+      
     } catch (Throwable e) {
       LOGGER.info("Found exception when get fields, caused by {}", e);
     }
@@ -308,6 +325,158 @@ public class KerberizedHadoop implements Serializable {
       });
     }, 1000L, 5, Sets.newHashSet(BindException.class));
     LOGGER.info("start kerberizeddfs 6!");
+  }
+
+  private List<String> loadConfigFile(final String fileName)
+      throws IOException {
+    try {
+      List<String> v = new ArrayList<>();
+      try (BufferedReader br = new BufferedReader(new InputStreamReader(
+          AccessController.doPrivileged(
+              new PrivilegedExceptionAction<FileInputStream> () {
+                public FileInputStream run() throws IOException {
+                  return new FileInputStream(fileName);
+                }
+              })))) {
+        String line;
+        String previous = null;
+        while ((line = br.readLine()) != null) {
+          line = line.trim();
+          if (line.isEmpty() || line.startsWith("#") || line.startsWith(";")) {
+            // ignore comments and blank line
+            // Comments start with '#' or ';'
+            continue;
+          }
+          // In practice, a subsection might look like:
+          //      [realms]
+          //      EXAMPLE.COM =
+          //      {
+          //          kdc = kerberos.example.com
+          //          ...
+          //      }
+          // Before parsed into stanza table, it needs to be
+          // converted into a canonicalized style (no indent):
+          //      realms = {
+          //          EXAMPLE.COM = {
+          //              kdc = kerberos.example.com
+          //              ...
+          //          }
+          //      }
+          //
+          if (line.startsWith("[")) {
+            if (!line.endsWith("]")) {
+              throw new RuntimeException("Illegal config content:"
+                  + line);
+            }
+            if (previous != null) {
+              v.add(previous);
+              v.add("}");
+            }
+            String title = line.substring(
+                1, line.length()-1).trim();
+            if (title.isEmpty()) {
+              throw new RuntimeException("Illegal config content:"
+                  + line);
+            }
+            previous = title + " = {";
+          } else if (line.startsWith("{")) {
+            if (previous == null) {
+              throw new RuntimeException(
+                  "Config file should not start with \"{\"");
+            }
+            previous += " {";
+            if (line.length() > 1) {
+              // { and content on the same line
+              v.add(previous);
+              previous = line.substring(1).trim();
+            }
+          } else {
+            // Lines before the first section are ignored
+            if (previous != null) {
+              v.add(previous);
+              previous = line;
+            }
+          }
+        }
+        if (previous != null) {
+          v.add(previous);
+          v.add("}");
+        }
+      }
+      return v;
+    } catch (java.security.PrivilegedActionException pe) {
+      throw (IOException)pe.getException();
+    }
+  }
+
+  private Hashtable<String,Object> stanzaTable = new Hashtable<>();
+
+  private Hashtable<String,Object> parseStanzaTable(List<String> v) {
+    Hashtable<String,Object> current = stanzaTable;
+    for (String line: v) {
+      // There are 3 kinds of lines
+      // 1. a = b
+      // 2. a = {
+      // 3. }
+      if (line.equals("}")) {
+        // Go back to parent, see below
+        current = (Hashtable<String,Object>)current.remove(" PARENT ");
+        if (current == null) {
+          throw new RuntimeException("Unmatched close brace");
+        }
+      } else {
+        int pos = line.indexOf('=');
+        if (pos < 0) {
+          throw new RuntimeException("Illegal config content:" + line);
+        }
+        String key = line.substring(0, pos).trim();
+        String value = trimmed(line.substring(pos+1));
+        if (value.equals("{")) {
+          Hashtable<String,Object> subTable;
+          if (current == stanzaTable) {
+            key = key.toLowerCase(Locale.US);
+          }
+          subTable = new Hashtable<>();
+          current.put(key, subTable);
+          // A special entry for its parent. Put whitespaces around,
+          // so will never be confused with a normal key
+          subTable.put(" PARENT ", current);
+          current = subTable;
+        } else {
+          Vector<String> values;
+          if (current.containsKey(key)) {
+            Object obj = current.get(key);
+            // If a key first shows as a section and then a value,
+            // this is illegal. However, we haven't really forbid
+            // first value then section, which the final result
+            // is a section.
+            if (!(obj instanceof Vector)) {
+              throw new RuntimeException("Key " + key
+                  + "used for both value and section");
+            }
+            values = (Vector<String>)current.get(key);
+          } else {
+            values = new Vector<String>();
+            current.put(key, values);
+          }
+          values.add(value);
+        }
+      }
+    }
+    if (current != stanzaTable) {
+      throw new RuntimeException("Not closed");
+    }
+    return current;
+  }
+
+  private static String trimmed(String s) {
+    s = s.trim();
+    if (s.length() >= 2 &&
+        ((s.charAt(0) == '"' && s.charAt(s.length()-1) == '"') ||
+            (s.charAt(0) == '\'' && s.charAt(s.length()-1) == '\''))) {
+      s = s.substring(1, s.length()-1).trim();
+    }
+    return s;
   }
 
   private void startKDC() throws Exception {
