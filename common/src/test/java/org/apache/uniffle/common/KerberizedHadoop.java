@@ -250,7 +250,7 @@ public class KerberizedHadoop implements Serializable {
       }
       method = c.getClass().getDeclaredMethod("get", String[].class);
       method.setAccessible(true);
-      String realm = (String) method.invoke(c, new String[]{"libdefaults", "default_realm"});
+      String realm = (String) method.invoke(c, new Object[]{new String[]{"libdefaults", "default_realm"}});
       LOGGER.info("realm from reflection invoke is {}", realm);
       method = c.getClass().getDeclaredMethod("useDNS_Realm");
       method.setAccessible(true);
