@@ -509,6 +509,7 @@ public class KerberizedHadoop implements Serializable {
 
     krb5ConfFile = kdc.getKrb5conf().getAbsolutePath();
     System.setProperty("java.security.krb5.conf", krb5ConfFile);
+    Config.refresh();
   }
 
   public void tearDown() throws IOException {
