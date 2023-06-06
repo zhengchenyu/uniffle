@@ -344,6 +344,12 @@
       </dependency>
 
       <dependency>
+        <groupId>org.apache.uniffle</groupId>
+        <artifactId>hadoop${hadoop.short.version}-shim</artifactId>
+        <version>${project.version}</version>
+      </dependency>
+
+      <dependency>
         <groupId>org.apache.hadoop</groupId>
         <artifactId>hadoop-common</artifactId>
         <version>${hadoop.version}</version>
@@ -1642,11 +1648,6 @@
             <artifactId>hadoop-mapreduce-examples</artifactId>
             <version>${hadoop.version}</version>
             <scope>test</scope>
-          </dependency>
-          <dependency>
-            <groupId>org.apache.uniffle</groupId>
-            <artifactId>hadoop${hadoop.short.version}-shim</artifactId>
-            <version>${project.version}</version>
           </dependency>
         </dependencies>
       </dependencyManagement>
