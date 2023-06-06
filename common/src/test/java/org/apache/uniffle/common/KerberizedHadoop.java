@@ -224,6 +224,7 @@ public class KerberizedHadoop implements Serializable {
       }
       c = Config.getInstance();
       Method method = c.getClass().getDeclaredMethod("getProperty", String.class);
+      method.setAccessible(true);
       String str = (String) method.invoke(c, "java.security.krb5.kdc");
       if (str == null) {
         LOGGER.info("the value of java.security.krb5.kdc is null");
@@ -237,6 +238,7 @@ public class KerberizedHadoop implements Serializable {
         LOGGER.info("the value of java.security.krb5.realm is not null");
       }
       method = c.getClass().getDeclaredMethod("getJavaFileName", String.class);
+      method.setAccessible(true);
       str = (String) method.invoke(c);
       LOGGER.info("the value of getJavaFileName is {}", str);
       
