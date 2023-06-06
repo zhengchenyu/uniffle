@@ -22,12 +22,16 @@ import java.io.File;
 import java.io.IOException;
 import java.io.OutputStreamWriter;
 import java.io.Serializable;
+import java.lang.reflect.Field;
+import java.lang.reflect.Method;
 import java.net.BindException;
 import java.net.ServerSocket;
 import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
 import java.nio.file.Path;
+import java.security.CodeSource;
 import java.security.PrivilegedExceptionAction;
+import java.security.ProtectionDomain;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Properties;
@@ -48,11 +52,13 @@ import org.apache.hadoop.security.UserGroupInformation;
 import org.apache.hadoop.security.authorize.AuthorizationException;
 import org.apache.hadoop.security.authorize.ImpersonationProvider;
 import org.apache.hadoop.security.ssl.KeyStoreTestUtil;
+import org.apache.kerby.kerberos.kerb.server.SimpleKdcServer;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 import org.apache.uniffle.common.util.RetryUtils;
 import org.apache.uniffle.common.util.RssUtils;
+import sun.security.krb5.Config;
 
 import static org.apache.hadoop.fs.CommonConfigurationKeys.IPC_CLIENT_CONNECT_MAX_RETRIES_ON_SASL_KEY;
 import static org.apache.hadoop.fs.CommonConfigurationKeysPublic.HADOOP_SECURITY_AUTHENTICATION;
@@ -190,6 +196,27 @@ public class KerberizedHadoop implements Serializable {
     for (int i = 0; i < lines.size(); i++) {
       LOGGER.info("KRB FILE line {}, content = {}", i, lines.get(i));
     }
+
+    try {
+      ProtectionDomain pd = kdc.getClass().getProtectionDomain();
+      CodeSource cs = pd.getCodeSource();
+      LOGGER.info("KDC class from {}", cs.getLocation());
+      Field field = kdc.getClass().getDeclaredField("simpleKdc");
+      field.setAccessible(true);
+      SimpleKdcServer simpleKdc = (SimpleKdcServer) field.get(kdc);
+      pd = simpleKdc.getClass().getProtectionDomain();
+      cs = pd.getCodeSource();
+      LOGGER.info("SimpleKdcServer class from {}", cs.getLocation());
+      if (System.getProperty("java.vendor").contains("IBM")) {
+        throw new RuntimeException("use ibm java here!");
+      }
+      Config c = Config.getInstance();
+      LOGGER.info("kerberos Config is {}", c);
+      String realm = c.getDefaultRealm();
+      LOGGER.info("realm is {}", realm);
+    } catch (Throwable e) {
+      LOGGER.info("Found exception when get fields, caused by {}", e);
+    }
     
     UserGroupInformation.setConfiguration(conf);
     UserGroupInformation.setShouldRenewImmediatelyForTests(true);
@@ -237,6 +264,7 @@ public class KerberizedHadoop implements Serializable {
     kdcConf.setProperty(MiniKdc.ORG_DOMAIN, "COM");
     kdcConf.setProperty(MiniKdc.KDC_BIND_ADDRESS, hostName);
     kdcConf.setProperty(MiniKdc.KDC_PORT, "0");
+    kdcConf.setProperty(MiniKdc.DEBUG, "true");
     workDir = tempDir.toFile();
     kdc = new MiniKdc(kdcConf, workDir);
     kdc.start();
