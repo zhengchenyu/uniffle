@@ -28,8 +28,6 @@ import org.apache.hadoop.mapreduce.v2.app.rm.RMContainerAllocator;
 import org.apache.hadoop.mapreduce.v2.app.rm.preemption.NoopAMPreemptionPolicy;
 import org.apache.hadoop.yarn.api.protocolrecords.AllocateResponse;
 import org.apache.hadoop.yarn.exceptions.YarnException;
-import sun.security.krb5.Config;
-import sun.security.krb5.KrbException;
 
 public class HadoopShimImpl {
 
@@ -48,9 +46,5 @@ public class HadoopShimImpl {
         return response;
       }
     };
-  }
-
-  public static void refreshKrb5Conf() throws KrbException {
-    Config.refresh();
   }
 }

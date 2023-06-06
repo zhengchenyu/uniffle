@@ -35,10 +35,6 @@
       <groupId>org.apache.uniffle</groupId>
     </dependency>
     <dependency>
-      <groupId>org.apache.uniffle</groupId>
-      <artifactId>hadoop${hadoop.short.version}-shim</artifactId>
-    </dependency>
-    <dependency>
       <groupId>info.picocli</groupId>
       <artifactId>picocli</artifactId>
     </dependency>
