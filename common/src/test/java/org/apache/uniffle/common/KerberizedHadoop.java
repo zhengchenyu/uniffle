@@ -25,6 +25,7 @@ import java.io.Serializable;
 import java.lang.reflect.Field;
 import java.lang.reflect.Method;
 import java.net.BindException;
+import java.net.InetAddress;
 import java.net.ServerSocket;
 import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
@@ -210,10 +211,6 @@ public class KerberizedHadoop implements Serializable {
       if (System.getProperty("java.vendor").contains("IBM")) {
         throw new RuntimeException("use ibm java here!");
       }
-//      Config c = Config.getInstance();
-//      LOGGER.info("kerberos Config is {}", c);
-//      String realm = c.getDefaultRealm();
-//      LOGGER.info("realm is {}", realm);
       Field field1 = Config.class.getDeclaredField("singleton");
       field1.setAccessible(true);
       Config c = (Config) field1.get(null);
@@ -223,6 +220,8 @@ public class KerberizedHadoop implements Serializable {
         LOGGER.info("before c is not null");
       }
       c = Config.getInstance();
+      LOGGER.info("kerberos Config is {}", c);
+      LOGGER.info("realm is {}", c.getDefaultRealm());
       Method method = c.getClass().getDeclaredMethod("getProperty", String.class);
       method.setAccessible(true);
       String str = (String) method.invoke(c, "java.security.krb5.kdc");
@@ -245,12 +244,22 @@ public class KerberizedHadoop implements Serializable {
       method.setAccessible(true);
       str = (String) method.invoke(c);
       LOGGER.info("the value of getJavaFileName is {}", str);
-      
       lines = Files.readAllLines(new File(str).toPath());
       for (int i = 0; i < lines.size(); i++) {
         LOGGER.info("JAVA FILE line {}, content = {}", i, lines.get(i));
       }
-      
+      method = c.getClass().getDeclaredMethod("get", String.class, String.class);
+      method.setAccessible(true);
+      String realm = (String) method.invoke(c, "libdefaults", "default_realm");
+      LOGGER.info("realm from reflection invoke is {}", realm);
+      method = c.getClass().getDeclaredMethod("useDNS_Realm");
+      method.setAccessible(true);
+      LOGGER.info("useDNS_Realm is {}", (boolean) method.invoke(c));
+      method = c.getClass().getDeclaredMethod("getRealmFromDNS");
+      method.setAccessible(true);
+      String realmFromDNS = (String) method.invoke(c);
+      LOGGER.info("realmFromDNS is {}", realmFromDNS == null ? "null" : realmFromDNS);
+      LOGGER.info("hostname is {}", InetAddress.getLocalHost().getCanonicalHostName());
     } catch (Throwable e) {
       LOGGER.info("Found exception when get fields, caused by {}", e);
     }
