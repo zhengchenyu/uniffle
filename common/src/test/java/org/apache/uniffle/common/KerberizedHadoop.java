@@ -227,6 +227,34 @@ public class KerberizedHadoop implements Serializable {
       } else {
         LOGGER.info("before c is not null");
       }
+      Method method = Config.class.getDeclaredMethod("getProperty", String.class);
+      method.setAccessible(true);
+      String str = (String) method.invoke(null, "java.security.krb5.kdc");
+      if (str == null) {
+        LOGGER.info("the value of java.security.krb5.kdc is null");
+      } else {
+        LOGGER.info("the value of java.security.krb5.kdc is not null");
+      }
+      str = (String) method.invoke(null, "java.security.krb5.realm");
+      if (str == null) {
+        LOGGER.info("the value of java.security.krb5.realm is null");
+      } else {
+        LOGGER.info("the value of java.security.krb5.realm is not null");
+      }
+      str = (String) method.invoke(null, "java.security.krb5.conf");
+      if (str == null) {
+        LOGGER.info("the value of java.security.krb5.conf is null");
+      } else {
+        LOGGER.info("the value of java.security.krb5.conf is not null");
+      }
+      List<String> loadedConfigFile = loadConfigFile(str);
+      for (int i = 0; i < loadedConfigFile.size(); i++) {
+        LOGGER.info("loadedConfigFile FILE line {}, content = {}", i, lines.get(i));
+      }
+      Hashtable<String,Object> hashtable = parseStanzaTable(loadedConfigFile);
+      for (Map.Entry<String, Object> entry : hashtable.entrySet()) {
+        LOGGER.info("hashtable key = {}, value = {}", entry.getKey(), entry.getValue());
+      }
       c = Config.getInstance();
       if (c == null) {
         LOGGER.info("after1 c is null");
@@ -239,20 +267,6 @@ public class KerberizedHadoop implements Serializable {
       Hashtable<String, Object> t = (Hashtable<String, Object>) fieldx.get(c);
       LOGGER.info("stanzaTable is {}", t);
       // LOGGER.info("realm is {}", c.getDefaultRealm());
-      Method method = c.getClass().getDeclaredMethod("getProperty", String.class);
-      method.setAccessible(true);
-      String str = (String) method.invoke(c, "java.security.krb5.kdc");
-      if (str == null) {
-        LOGGER.info("the value of java.security.krb5.kdc is null");
-      } else {
-        LOGGER.info("the value of java.security.krb5.kdc is not null");
-      }
-      str = (String) method.invoke(c, "java.security.krb5.realm");
-      if (str == null) {
-        LOGGER.info("the value of java.security.krb5.realm is null");
-      } else {
-        LOGGER.info("the value of java.security.krb5.realm is not null");
-      }
       LOGGER.info("user.name is {}", System.getProperty("user.home"));
       LOGGER.info("java.version is {}", System.getProperty("java.version"));
       LOGGER.info("os.name is {}", System.getProperty("os.name"));
@@ -261,14 +275,6 @@ public class KerberizedHadoop implements Serializable {
       method.setAccessible(true);
       str = (String) method.invoke(c);
       LOGGER.info("the value of getJavaFileName is {}", str);
-      List<String> loadedConfigFile = loadConfigFile(str);
-      for (int i = 0; i < loadedConfigFile.size(); i++) {
-        LOGGER.info("loadedConfigFile FILE line {}, content = {}", i, lines.get(i));
-      }
-      Hashtable<String,Object> hashtable = parseStanzaTable(loadedConfigFile);
-      for (Map.Entry<String, Object> entry : hashtable.entrySet()) {
-        LOGGER.info("hashtable key = {}, value = {}", entry.getKey(), entry.getValue());
-      }
       lines = Files.readAllLines(new File(str).toPath());
       for (int i = 0; i < lines.size(); i++) {
         LOGGER.info("JAVA FILE line {}, content = {}", i, lines.get(i));
