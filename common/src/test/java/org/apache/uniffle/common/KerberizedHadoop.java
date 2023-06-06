@@ -191,15 +191,7 @@ public class KerberizedHadoop implements Serializable {
     String krb5Conf = kdc.getKrb5conf().getAbsolutePath();
     System.setProperty("java.security.krb5.conf", krb5Conf);
 
-    Field fieldxx = Config.class.getDeclaredField("singleton");
-    fieldxx.setAccessible(true);
-    Config ccc = (Config) fieldxx.get(null);
-    if (ccc == null) {
-      LOGGER.info("beforea c is null");
-    } else {
-      LOGGER.info("beforea c is not null");
-    }
-
+    printsingleto("beforea");
     String principal = "hdfs/" + RssUtils.getHostIp();
     File keytab = new File(workDir, "hdfs.keytab");
     kdc.createPrincipal(keytab, principal);
@@ -207,22 +199,11 @@ public class KerberizedHadoop implements Serializable {
     hdfsPrincipal = principal + "@" + kdc.getRealm();
     LOGGER.info("start kerberizeddfs 2!");
 
-    ccc = (Config) fieldxx.get(null);
-    if (ccc == null) {
-      LOGGER.info("beforeb c is null");
-    } else {
-      LOGGER.info("beforeb c is not null");
-    }
-
+    printsingleto("beforeb");
     Configuration conf = new Configuration();
     conf.set(HADOOP_SECURITY_AUTHENTICATION, "kerberos");
-
-    ccc = (Config) fieldxx.get(null);
-    if (ccc == null) {
-      LOGGER.info("beforec c is null");
-    } else {
-      LOGGER.info("beforec c is not null");
-    }
+ 
+    printsingleto("beforec");
 
     LOGGER.info("kerberos config file is {}", krb5Conf);
     List<String> lines = Files.readAllLines(new File(krb5Conf).toPath());
@@ -243,14 +224,7 @@ public class KerberizedHadoop implements Serializable {
       if (System.getProperty("java.vendor").contains("IBM")) {
         throw new RuntimeException("use ibm java here!");
       }
-      Field field1 = Config.class.getDeclaredField("singleton");
-      field1.setAccessible(true);
-      Config c = (Config) field1.get(null);
-      if (c == null) {
-        LOGGER.info("before c is null");
-      } else {
-        LOGGER.info("before c is not null");
-      }
+      printsingleto("before");
       Method method = Config.class.getDeclaredMethod("getProperty", String.class);
       method.setAccessible(true);
       String str = (String) method.invoke(null, "java.security.krb5.kdc");
@@ -279,7 +253,7 @@ public class KerberizedHadoop implements Serializable {
       for (Map.Entry<String, Object> entry : hashtable.entrySet()) {
         LOGGER.info("hashtable key = {}, value = {}", entry.getKey(), entry.getValue());
       }
-      c = Config.getInstance();
+      Config c = Config.getInstance();
       if (c == null) {
         LOGGER.info("after1 c is null");
       } else {
@@ -321,14 +295,7 @@ public class KerberizedHadoop implements Serializable {
     }
     
     UserGroupInformation.setConfiguration(conf);
-    Field field1 = Config.class.getDeclaredField("singleton");
-    field1.setAccessible(true);
-    Config c = (Config) field1.get(null);
-    if (c == null) {
-      LOGGER.info("after c is null");
-    } else {
-      LOGGER.info("after c is not null");
-    }
+    printsingleto("after");
     UserGroupInformation.setShouldRenewImmediatelyForTests(true);
     final UserGroupInformation ugi =
         UserGroupInformation.loginUserFromKeytabAndReturnUGI(hdfsPrincipal, hdfsKeytab);
@@ -523,9 +490,10 @@ public class KerberizedHadoop implements Serializable {
     fieldxx.setAccessible(true);
     Config ccc = (Config) fieldxx.get(null);
     if (ccc == null) {
-      LOGGER.info(label + " c is null");
+      LOGGER.info(label + " singleto c is null");
     } else {
-      LOGGER.info(label + " c is not null");
+      LOGGER.info(label + " singleto c is not null, and hash code of c is " + Integer.toHexString(System.identityHashCode(ccc)));
+      LOGGER.info(label + " singleto c is " + ccc);
     }
   }
 
