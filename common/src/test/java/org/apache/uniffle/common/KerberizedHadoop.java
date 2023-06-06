@@ -210,15 +210,54 @@ public class KerberizedHadoop implements Serializable {
       if (System.getProperty("java.vendor").contains("IBM")) {
         throw new RuntimeException("use ibm java here!");
       }
-      Config c = Config.getInstance();
-      LOGGER.info("kerberos Config is {}", c);
-      String realm = c.getDefaultRealm();
-      LOGGER.info("realm is {}", realm);
+//      Config c = Config.getInstance();
+//      LOGGER.info("kerberos Config is {}", c);
+//      String realm = c.getDefaultRealm();
+//      LOGGER.info("realm is {}", realm);
+      Field field1 = Config.class.getDeclaredField("singleton");
+      field1.setAccessible(true);
+      Config c = (Config) field1.get(null);
+      if (c == null) {
+        LOGGER.info("before c is null");
+      } else {
+        LOGGER.info("before c is not null");
+      }
+      c = Config.getInstance();
+      Method method = c.getClass().getDeclaredMethod("getProperty", String.class);
+      String str = (String) method.invoke(c, "java.security.krb5.kdc");
+      if (str == null) {
+        LOGGER.info("the value of java.security.krb5.kdc is null");
+      } else {
+        LOGGER.info("the value of java.security.krb5.kdc is not null");
+      }
+      str = (String) method.invoke(c, "java.security.krb5.realm");
+      if (str == null) {
+        LOGGER.info("the value of java.security.krb5.realm is null");
+      } else {
+        LOGGER.info("the value of java.security.krb5.realm is not null");
+      }
+      method = c.getClass().getDeclaredMethod("getJavaFileName", String.class);
+      str = (String) method.invoke(c);
+      LOGGER.info("the value of getJavaFileName is {}", str);
+      
+      lines = Files.readAllLines(new File(str).toPath());
+      for (int i = 0; i < lines.size(); i++) {
+        LOGGER.info("JAVA FILE line {}, content = {}", i, lines.get(i));
+      }
+      
     } catch (Throwable e) {
       LOGGER.info("Found exception when get fields, caused by {}", e);
     }
     
     UserGroupInformation.setConfiguration(conf);
+    Field field1 = Config.class.getDeclaredField("singleton");
+    field1.setAccessible(true);
+    Config c = (Config) field1.get(null);
+    if (c == null) {
+      LOGGER.info("after c is null");
+    } else {
+      LOGGER.info("after c is not null");
+    }
     UserGroupInformation.setShouldRenewImmediatelyForTests(true);
     final UserGroupInformation ugi =
         UserGroupInformation.loginUserFromKeytabAndReturnUGI(hdfsPrincipal, hdfsKeytab);

@@ -95,6 +95,9 @@ public class MRIntegrationTestBase extends IntegrationTestBase {
   }
 
   public void run() throws Exception {
+    if (true) {
+      throw new RuntimeException("exit for quick CI");      
+    }
     JobConf appConf = new JobConf(mrYarnCluster.getConfig());
     updateCommonConfiguration(appConf);
     runOriginApp(appConf);
