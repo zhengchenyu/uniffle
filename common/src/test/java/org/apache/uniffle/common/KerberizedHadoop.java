@@ -228,7 +228,16 @@ public class KerberizedHadoop implements Serializable {
         LOGGER.info("before c is not null");
       }
       c = Config.getInstance();
+      if (c == null) {
+        LOGGER.info("after1 c is null");
+      } else {
+        LOGGER.info("after1 c is not null");
+      }
       LOGGER.info("kerberos Config is {}", c);
+      Field fieldx = c.getClass().getDeclaredField("stanzaTable");
+      fieldx.setAccessible(true);
+      Hashtable<String, Object> t = (Hashtable<String, Object>) fieldx.get(c);
+      LOGGER.info("stanzaTable is {}", t);
       // LOGGER.info("realm is {}", c.getDefaultRealm());
       Method method = c.getClass().getDeclaredMethod("getProperty", String.class);
       method.setAccessible(true);
