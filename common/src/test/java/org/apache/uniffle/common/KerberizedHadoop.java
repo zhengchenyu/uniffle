@@ -237,7 +237,11 @@ public class KerberizedHadoop implements Serializable {
       } else {
         LOGGER.info("the value of java.security.krb5.realm is not null");
       }
-      method = c.getClass().getDeclaredMethod("getJavaFileName", String.class);
+      LOGGER.info("user.name is {}", System.getProperty("user.home"));
+      LOGGER.info("java.version is {}", System.getProperty("java.version"));
+      LOGGER.info("os.name is {}", System.getProperty("os.name"));
+      LOGGER.info("java.vendor.url is {}", System.getProperty("java.vendor.url"));
+      method = c.getClass().getDeclaredMethod("getJavaFileName");
       method.setAccessible(true);
       str = (String) method.invoke(c);
       LOGGER.info("the value of getJavaFileName is {}", str);
