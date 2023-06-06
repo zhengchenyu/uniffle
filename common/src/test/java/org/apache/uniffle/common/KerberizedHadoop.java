@@ -299,9 +299,11 @@ public class KerberizedHadoop implements Serializable {
     UserGroupInformation.setShouldRenewImmediatelyForTests(true);
     final UserGroupInformation ugi =
         UserGroupInformation.loginUserFromKeytabAndReturnUGI(hdfsPrincipal, hdfsKeytab);
+    printsingleto("loginUserFromKeytabAndReturnUGI");
 
     LOGGER.info("start kerberizeddfs 3!");
     Configuration hdfsConf = createSecureDFSConfig();
+    printsingleto("createSecureDFSConfig");
     hdfsConf.set("hadoop.proxyuser.hdfs.hosts", "*");
     hdfsConf.set("hadoop.proxyuser.hdfs.groups", "*");
     hdfsConf.set("hadoop.proxyuser.hdfs.users", "*");
@@ -320,16 +322,20 @@ public class KerberizedHadoop implements Serializable {
         @Override
         public MiniDFSCluster run() throws Exception {
           LOGGER.info("start kerberizeddfs 5!");
-          return new MiniDFSCluster
+          printsingleto("before construct dfs cluster");
+          MiniDFSCluster miniDFSCluster = new MiniDFSCluster
               .Builder(hdfsConf)
               .nameNodePort(ports.get(4))
               .numDataNodes(1)
               .clusterId("kerberized-cluster-1")
               .checkDataNodeAddrConfig(true)
               .build();
+          printsingleto("after construct dfs cluster");
+          return miniDFSCluster;
         }
       });
     }, 1000L, 5, Sets.newHashSet(BindException.class));
+    printsingleto("kerberizedDfsCluster-retry");
     LOGGER.info("start kerberizeddfs 6!");
   }
 

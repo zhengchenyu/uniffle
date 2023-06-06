@@ -50,6 +50,7 @@ public class KerberizedHadoopBase {
     LOG.info("kerberizedHadoop will tear down!");
     kerberizedHadoop.tearDown();
     kerberizedHadoop = null;
+    KerberizedHadoop.printsingleto("clear");
   }
 
   public static void initHadoopSecurityContext() throws Exception {
