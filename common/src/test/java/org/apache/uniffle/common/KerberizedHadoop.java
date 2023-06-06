@@ -53,6 +53,7 @@ import org.slf4j.LoggerFactory;
 
 import org.apache.uniffle.common.util.RetryUtils;
 import org.apache.uniffle.common.util.RssUtils;
+import org.apache.uniffle.hadoop.shim.HadoopShimImpl;
 
 import static org.apache.hadoop.fs.CommonConfigurationKeys.IPC_CLIENT_CONNECT_MAX_RETRIES_ON_SASL_KEY;
 import static org.apache.hadoop.fs.CommonConfigurationKeysPublic.HADOOP_SECURITY_AUTHENTICATION;
@@ -167,9 +168,6 @@ public class KerberizedHadoop implements Serializable {
   }
 
   private void startKerberizedDFS() throws Throwable {
-    String krb5Conf = kdc.getKrb5conf().getAbsolutePath();
-    System.setProperty("java.security.krb5.conf", krb5Conf);
-
     String principal = "hdfs/" + RssUtils.getHostIp();
     File keytab = new File(workDir, "hdfs.keytab");
     kdc.createPrincipal(keytab, principal);
@@ -228,6 +226,8 @@ public class KerberizedHadoop implements Serializable {
 
     krb5ConfFile = kdc.getKrb5conf().getAbsolutePath();
     System.setProperty("java.security.krb5.conf", krb5ConfFile);
+    // reload the configuration from java.security.krb5.conf
+    HadoopShimImpl.refreshKrb5Conf();
   }
 
   public void tearDown() throws IOException {
