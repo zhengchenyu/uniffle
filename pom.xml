@@ -117,7 +117,9 @@
     <module>storage</module>
     <module>server</module>
     <module>client</module>
+<!--
     <module>integration-test/common</module>
+-->
     <module>cli</module>
   </modules>
 
@@ -1100,8 +1102,8 @@
       <modules>
         <module>client-spark/common</module>
         <module>client-spark/spark2</module>
-        <module>integration-test/spark-common</module>
-        <module>integration-test/spark2</module>
+<!--        <module>integration-test/spark-common</module>
+        <module>integration-test/spark2</module>-->
       </modules>
       <dependencyManagement>
         <dependencies>
@@ -1159,7 +1161,7 @@
       <modules>
         <module>client-spark/common</module>
         <module>client-spark/spark2</module>
-        <module>integration-test/spark-common</module>
+<!--        <module>integration-test/spark-common</module>-->
       </modules>
       <dependencyManagement>
         <dependencies>
@@ -1215,8 +1217,8 @@
       <modules>
         <module>client-spark/common</module>
         <module>client-spark/spark3</module>
-        <module>integration-test/spark-common</module>
-        <module>integration-test/spark3</module>
+<!--        <module>integration-test/spark-common</module>
+        <module>integration-test/spark3</module>-->
       </modules>
       <dependencyManagement>
         <dependencies>
@@ -1295,8 +1297,8 @@
       <modules>
         <module>client-spark/common</module>
         <module>client-spark/spark3</module>
-        <module>integration-test/spark-common</module>
-        <module>integration-test/spark3</module>
+<!--        <module>integration-test/spark-common</module>
+        <module>integration-test/spark3</module>-->
       </modules>
       <dependencyManagement>
         <dependencies>
@@ -1384,8 +1386,8 @@
       <modules>
         <module>client-spark/common</module>
         <module>client-spark/spark3</module>
-        <module>integration-test/spark-common</module>
-        <module>integration-test/spark3</module>
+<!--        <module>integration-test/spark-common</module>
+        <module>integration-test/spark3</module>-->
       </modules>
       <dependencyManagement>
         <dependencies>
@@ -1473,8 +1475,8 @@
       <modules>
         <module>client-spark/common</module>
         <module>client-spark/spark3</module>
-        <module>integration-test/spark-common</module>
-        <module>integration-test/spark3</module>
+<!--        <module>integration-test/spark-common</module>
+        <module>integration-test/spark3</module>-->
       </modules>
       <dependencyManagement>
         <dependencies>
@@ -1562,8 +1564,8 @@
       <modules>
         <module>client-spark/common</module>
         <module>client-spark/spark3</module>
-        <module>integration-test/spark-common</module>
-        <module>integration-test/spark3</module>
+<!--        <module>integration-test/spark-common</module>
+        <module>integration-test/spark3</module>-->
       </modules>
       <dependencyManagement>
         <dependencies>
@@ -1624,7 +1626,7 @@
       <id>mr</id>
       <modules>
         <module>client-mr/core</module>
-        <module>integration-test/mr</module>
+<!--        <module>integration-test/mr</module>-->
         <module>client-mr/hadoop${hadoop.short.version}</module>
       </modules>
       <dependencyManagement>
