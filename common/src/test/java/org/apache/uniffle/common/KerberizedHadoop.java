@@ -22,6 +22,7 @@ import java.io.File;
 import java.io.IOException;
 import java.io.OutputStreamWriter;
 import java.io.Serializable;
+import java.lang.reflect.Method;
 import java.net.BindException;
 import java.net.ServerSocket;
 import java.nio.charset.StandardCharsets;
@@ -48,6 +49,7 @@ import org.apache.hadoop.security.UserGroupInformation;
 import org.apache.hadoop.security.authorize.AuthorizationException;
 import org.apache.hadoop.security.authorize.ImpersonationProvider;
 import org.apache.hadoop.security.ssl.KeyStoreTestUtil;
+import org.apache.hadoop.util.VersionInfo;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -67,6 +69,7 @@ import static org.apache.hadoop.hdfs.DFSConfigKeys.DFS_NAMENODE_KERBEROS_PRINCIP
 import static org.apache.hadoop.hdfs.DFSConfigKeys.DFS_NAMENODE_KEYTAB_FILE_KEY;
 import static org.apache.hadoop.hdfs.DFSConfigKeys.DFS_WEB_AUTHENTICATION_KERBEROS_PRINCIPAL_KEY;
 import static org.apache.hadoop.hdfs.client.HdfsClientConfigKeys.DFS_DATA_TRANSFER_PROTECTION_KEY;
+import static org.apache.hadoop.util.PlatformName.IBM_JAVA;
 import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
@@ -167,9 +170,6 @@ public class KerberizedHadoop implements Serializable {
   }
 
   private void startKerberizedDFS() throws Throwable {
-    String krb5Conf = kdc.getKrb5conf().getAbsolutePath();
-    System.setProperty("java.security.krb5.conf", krb5Conf);
-
     String principal = "hdfs/" + RssUtils.getHostIp();
     File keytab = new File(workDir, "hdfs.keytab");
     kdc.createPrincipal(keytab, principal);
@@ -228,6 +228,17 @@ public class KerberizedHadoop implements Serializable {
 
     krb5ConfFile = kdc.getKrb5conf().getAbsolutePath();
     System.setProperty("java.security.krb5.conf", krb5ConfFile);
+    String version = VersionInfo.getVersion();
+    if (version.equals("3.2.1")) {
+      Class<?> classRef;
+      if (IBM_JAVA) {
+        classRef = Class.forName("com.ibm.security.krb5.internal.Config");
+      } else {
+        classRef = Class.forName("sun.security.krb5.Config");
+      }
+      Method refreshMethod = classRef.getDeclaredMethod("refresh");
+      refreshMethod.invoke(null);      
+    }
   }
 
   public void tearDown() throws IOException {
