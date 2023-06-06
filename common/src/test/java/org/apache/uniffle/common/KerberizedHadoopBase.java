@@ -36,9 +36,13 @@ public class KerberizedHadoopBase {
   protected static Class<?> testRunner = KerberizedHadoopBase.class;
 
   public static void init() throws Exception {
+    KerberizedHadoop.printsingleto("init1");
     kerberizedHadoop = new KerberizedHadoop();
+    KerberizedHadoop.printsingleto("init2");
     kerberizedHadoop.setTestRunner(testRunner);
+    KerberizedHadoop.printsingleto("init3");
     kerberizedHadoop.setup();
+    KerberizedHadoop.printsingleto("init4");
   }
 
   @AfterAll

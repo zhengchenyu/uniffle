@@ -17,6 +17,7 @@
 
 package org.apache.uniffle.common.security;
 
+import org.apache.uniffle.common.KerberizedHadoop;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeAll;
 import org.junit.jupiter.api.Test;
@@ -34,7 +35,9 @@ public class SecurityContextFactoryTest extends KerberizedHadoopBase {
 
   @BeforeAll
   public static void beforeAll() throws Exception {
+    KerberizedHadoop.printsingleto("beforeAll1 in SecurityContextFactoryTest ");
     testRunner = SecurityContextFactoryTest.class;
+    KerberizedHadoop.printsingleto("beforeAll2 in SecurityContextFactoryTest ");
     KerberizedHadoopBase.init();
     LOG.info("KerberizedHadoopBase inited in SecurityContextFactoryTest!");
   }

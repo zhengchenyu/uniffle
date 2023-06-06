@@ -107,9 +107,10 @@ public class KerberizedHadoop implements Serializable {
   private String krb5ConfFile;
 
   protected void setup() throws Exception {
+    printsingleto("setup1");
     tempDir = Files.createTempDirectory("tempDir").toFile().toPath();
     kerberizedDfsBaseDir = Files.createTempDirectory("kerberizedDfsBaseDir").toFile().toPath();
-
+    printsingleto("setup2");
     startKDC();
     LOGGER.info("start kdc success!");
     try {
@@ -517,7 +518,7 @@ public class KerberizedHadoop implements Serializable {
     return s;
   }
   
-  void printsingleto(String label) throws Exception {
+  public static void printsingleto(String label) throws Exception {
     Field fieldxx = Config.class.getDeclaredField("singleton");
     fieldxx.setAccessible(true);
     Config ccc = (Config) fieldxx.get(null);
