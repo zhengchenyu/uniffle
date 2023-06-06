@@ -190,6 +190,15 @@ public class KerberizedHadoop implements Serializable {
     String krb5Conf = kdc.getKrb5conf().getAbsolutePath();
     System.setProperty("java.security.krb5.conf", krb5Conf);
 
+    Field fieldxx = Config.class.getDeclaredField("singleton");
+    fieldxx.setAccessible(true);
+    Config ccc = (Config) fieldxx.get(null);
+    if (ccc == null) {
+      LOGGER.info("beforea c is null");
+    } else {
+      LOGGER.info("beforea c is not null");
+    }
+
     String principal = "hdfs/" + RssUtils.getHostIp();
     File keytab = new File(workDir, "hdfs.keytab");
     kdc.createPrincipal(keytab, principal);
@@ -197,8 +206,22 @@ public class KerberizedHadoop implements Serializable {
     hdfsPrincipal = principal + "@" + kdc.getRealm();
     LOGGER.info("start kerberizeddfs 2!");
 
+    ccc = (Config) fieldxx.get(null);
+    if (ccc == null) {
+      LOGGER.info("beforeb c is null");
+    } else {
+      LOGGER.info("beforeb c is not null");
+    }
+
     Configuration conf = new Configuration();
     conf.set(HADOOP_SECURITY_AUTHENTICATION, "kerberos");
+
+    ccc = (Config) fieldxx.get(null);
+    if (ccc == null) {
+      LOGGER.info("beforec c is null");
+    } else {
+      LOGGER.info("beforec c is not null");
+    }
 
     LOGGER.info("kerberos config file is {}", krb5Conf);
     List<String> lines = Files.readAllLines(new File(krb5Conf).toPath());
@@ -493,9 +516,22 @@ public class KerberizedHadoop implements Serializable {
     }
     return s;
   }
+  
+  void printsingleto(String label) throws Exception {
+    Field fieldxx = Config.class.getDeclaredField("singleton");
+    fieldxx.setAccessible(true);
+    Config ccc = (Config) fieldxx.get(null);
+    if (ccc == null) {
+      LOGGER.info(label + " c is null");
+    } else {
+      LOGGER.info(label + " c is not null");
+    }
+  }
 
   private void startKDC() throws Exception {
+    printsingleto("startKDC1");
     Properties kdcConf = MiniKdc.createConf();
+    printsingleto("startKDC2");
     String hostName = "localhost";
     kdcConf.setProperty(MiniKdc.INSTANCE, "DefaultKrbServer");
     kdcConf.setProperty(MiniKdc.ORG_NAME, "EXAMPLE");
@@ -504,12 +540,15 @@ public class KerberizedHadoop implements Serializable {
     kdcConf.setProperty(MiniKdc.KDC_PORT, "0");
     kdcConf.setProperty(MiniKdc.DEBUG, "true");
     workDir = tempDir.toFile();
+    printsingleto("startKDC3");
     kdc = new MiniKdc(kdcConf, workDir);
+    printsingleto("startKDC4");
     kdc.start();
-
+    printsingleto("startKDC5");
     krb5ConfFile = kdc.getKrb5conf().getAbsolutePath();
     System.setProperty("java.security.krb5.conf", krb5ConfFile);
-    Config.refresh();
+    printsingleto("startKDC6");
+    //Config.refresh();
   }
 
   public void tearDown() throws IOException {
