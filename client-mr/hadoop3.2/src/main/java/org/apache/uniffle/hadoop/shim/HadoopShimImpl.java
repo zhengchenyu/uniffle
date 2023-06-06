@@ -50,7 +50,7 @@ public class HadoopShimImpl {
     };
   }
 
-  public static void refreshKrb5Conf() throws Exception {
+  public static void refreshKrb5Conf() throws KrbException {
     Config.refresh();
   }
 }
