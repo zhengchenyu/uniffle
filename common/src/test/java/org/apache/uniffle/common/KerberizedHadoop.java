@@ -248,9 +248,9 @@ public class KerberizedHadoop implements Serializable {
       for (int i = 0; i < lines.size(); i++) {
         LOGGER.info("JAVA FILE line {}, content = {}", i, lines.get(i));
       }
-      method = c.getClass().getDeclaredMethod("get", String.class, String.class);
+      method = c.getClass().getDeclaredMethod("get", String[].class);
       method.setAccessible(true);
-      String realm = (String) method.invoke(c, "libdefaults", "default_realm");
+      String realm = (String) method.invoke(c, new String[]{"libdefaults", "default_realm"});
       LOGGER.info("realm from reflection invoke is {}", realm);
       method = c.getClass().getDeclaredMethod("useDNS_Realm");
       method.setAccessible(true);
