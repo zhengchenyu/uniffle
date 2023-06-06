@@ -1758,6 +1758,11 @@
             <version>${junit4.version}</version>
             <scope>test</scope>
           </dependency>
+          <dependency>
+            <groupId>org.apache.kerby</groupId>
+            <artifactId>kerb-simplekdc</artifactId>
+            <version>1.0.1</version>
+          </dependency>
         </dependencies>
       </dependencyManagement>
     </profile>
