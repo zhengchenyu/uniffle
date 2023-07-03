@@ -62,7 +62,7 @@ public class TezCartesianProductTest extends TezIntegrationTestBase {
 
   @Override
   public String[] getTestArgs(String uniqueOutputName) {
-    return new String[] {"-unpartitioned", inputPath1, inputPath2, inputPath3, outputPath + "/" + uniqueOutputName};
+    return new String[] {"-partitioned", inputPath1, inputPath2, inputPath3, outputPath + "/" + uniqueOutputName};
   }
 
   @Override

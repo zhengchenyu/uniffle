@@ -17,6 +17,7 @@
 
 package org.apache.uniffle.test;
 
+import org.apache.hadoop.fs.Path;
 import org.apache.hadoop.util.ToolRunner;
 import org.apache.tez.dag.api.TezConfiguration;
 import org.apache.tez.examples.JoinDataGen;
@@ -34,6 +35,9 @@ public class TezJoinIntegrationTestBase extends TezIntegrationTestBase {
   protected static final String NUM_TASKS = "2";
   
   protected void generateInputFile() throws Exception {
+    fs.delete(new Path(STREAM_INPUT_PATH), true);
+    fs.delete(new Path(HASH_INPUT_PATH), true);
+    fs.delete(new Path(JOIN_EXPECTED_PATH), true);
     String[] args = {STREAM_INPUT_PATH, STREAM_INPUT_FILE_SIZE, HASH_INPUT_PATH, HASH_INPUT_FILE_SIZE, 
         JOIN_EXPECTED_PATH, NUM_TASKS};
     JoinDataGen dataGen = new JoinDataGen();
@@ -57,7 +61,6 @@ public class TezJoinIntegrationTestBase extends TezIntegrationTestBase {
     updateRssConfiguration(appConf);
     appendAndUploadRssJars(appConf);
     runTezApp(appConf, getTestTool(), overrideArgs);
-    String rssPath = getOutputDir(null);
     
     // 2 check the result
     verifyResults(JOIN_EXPECTED_PATH, getOutputDir(""));

@@ -17,6 +17,7 @@
 
 package org.apache.uniffle.test;
 
+import org.apache.hadoop.fs.Path;
 import org.apache.hadoop.util.Tool;
 import org.apache.tez.examples.HashJoinExample;
 import org.junit.jupiter.api.Test;
@@ -28,17 +29,20 @@ public class TezHashJoinTest extends TezJoinIntegrationTestBase {
   @Test
   public void hashJoinTest() throws Exception {
     generateInputFile();
+    fs.delete(new Path(HASH_JOIN_OUTPUT_PATH), true);
     run(getTestArgs(HASH_JOIN_OUTPUT_PATH));
   }
 
   @Test
   public void hashJoinDoBroadcastTest() throws Exception {
+    generateInputFile();
     String[] orignal = getTestArgs(HASH_JOIN_OUTPUT_PATH);
     String[] args = new String[orignal.length + 1];
     for (int i = 0; i < orignal.length; i++) {
       args[i] = orignal[i];
     }
     args[orignal.length] = "doBroadcast";
+    fs.delete(new Path(HASH_JOIN_OUTPUT_PATH), true);
     run(args);
   }
 
