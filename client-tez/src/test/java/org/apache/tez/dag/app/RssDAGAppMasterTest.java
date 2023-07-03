@@ -79,6 +79,7 @@ import static org.apache.tez.common.RssTezConfig.RSS_AM_SHUFFLE_MANAGER_PORT;
 import static org.apache.tez.common.RssTezConfig.RSS_SHUFFLE_DESTINATION_VERTEX_ID;
 import static org.apache.tez.common.RssTezConfig.RSS_SHUFFLE_SOURCE_VERTEX_ID;
 import static org.apache.tez.common.RssTezConfig.RSS_STORAGE_TYPE;
+import static org.apache.tez.runtime.library.api.TezRuntimeConfiguration.TEZ_RUNTIME_IFILE_READAHEAD_BYTES;
 import static org.awaitility.Awaitility.await;
 import static org.mockito.Mockito.doReturn;
 import static org.mockito.Mockito.mock;
@@ -194,12 +195,20 @@ public class RssDAGAppMasterTest {
     Assertions.assertEquals("value1", conf.get("tez.config1"));
     Assertions.assertEquals("value3", conf.get("tez.config3"));
     Assertions.assertNull(conf.get("tez.config2"));
+    // TEZ_RUNTIME_IFILE_READAHEAD_BYTES is in getConfigurationKeySet, so the config from client should deliver
+    // to Input/Output. But tez.config.from.client is not in getConfigurationKeySet, so the config from client
+    // should not deliver to Input/Output.
+    Assertions.assertEquals(12345, conf.getInt(TEZ_RUNTIME_IFILE_READAHEAD_BYTES, -1));
+    Assertions.assertNull(conf.get("tez.config.from.client"));
     // 4 verfiy vertex id
     Assertions.assertEquals(expectedSourceVertexId, conf.getInt(RSS_SHUFFLE_SOURCE_VERTEX_ID, -1));
     Assertions.assertEquals(expectedDestinationVertexId, conf.getInt(RSS_SHUFFLE_DESTINATION_VERTEX_ID, -1));
   }
 
   private static DAG createDAG(String dageName, Configuration conf) {
+    conf.setInt(TEZ_RUNTIME_IFILE_READAHEAD_BYTES, 12345);
+    conf.set("tez.config.from.client", "value.from.client");
+
     DataSourceDescriptor dummyInput = DataSourceDescriptor.create(
         InputDescriptor.create("dummyclass"), InputInitializerDescriptor.create(""), null);
 
@@ -216,7 +225,8 @@ public class RssDAGAppMasterTest {
         OrderedPartitionedKVEdgeConfig.newBuilder(NullWritable.class.getName(), NullWritable.class.getName(),
             HashPartitioner.class.getName()).setFromConfiguration(conf).build();
     UnorderedKVEdgeConfig edgeConf23 =
-        UnorderedKVEdgeConfig.newBuilder(NullWritable.class.getName(), NullWritable.class.getName()).build();
+        UnorderedKVEdgeConfig.newBuilder(NullWritable.class.getName(), NullWritable.class.getName())
+            .setFromConfiguration(conf).build();
     UnorderedPartitionedKVEdgeConfig edgeConf34 =
         UnorderedPartitionedKVEdgeConfig.newBuilder(NullWritable.class.getName(), NullWritable.class.getName(),
             HashPartitioner.class.getName()).setFromConfiguration(conf).build();
