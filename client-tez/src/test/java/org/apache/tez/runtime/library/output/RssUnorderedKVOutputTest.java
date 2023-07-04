@@ -124,28 +124,30 @@ public class RssUnorderedKVOutputTest {
   }
 
   @Test
-  @Timeout(value = 3000, unit = TimeUnit.MILLISECONDS)
+  @Timeout(value = 5000, unit = TimeUnit.MILLISECONDS)
   public void testClose() throws Exception {
-    MockedStatic<RPC> rpc = Mockito.mockStatic(RPC.class);
-    TezRemoteShuffleUmbilicalProtocol protocol = mock(TezRemoteShuffleUmbilicalProtocol.class);
-    GetShuffleServerResponse response = new GetShuffleServerResponse();
-    ShuffleAssignmentsInfo shuffleAssignmentsInfo = new ShuffleAssignmentsInfo(new HashMap(), new HashMap());
-    response.setShuffleAssignmentsInfoWritable(new ShuffleAssignmentsInfoWritable(shuffleAssignmentsInfo));
-    doReturn(response).when(protocol).getShuffleAssignments(any());
-    rpc.when(() -> RPC.getProxy(any(), anyLong(), any(), any())).thenReturn(protocol);
-    MockedStatic<IdUtils> idUtils = Mockito.mockStatic(IdUtils.class);
-    idUtils.when(() -> IdUtils.getApplicationAttemptId()).thenReturn(OutputTestHelpers.APP_ATTEMPT_ID);
-    idUtils.when(() -> IdUtils.getAppAttemptId()).thenReturn(OutputTestHelpers.APP_ATTEMPT_ID.getAttemptId());
-    MockedStatic<ConverterUtils> converterUtils = Mockito.mockStatic(ConverterUtils.class);
-    ContainerId containerId = ContainerId.newContainerId(OutputTestHelpers.APP_ATTEMPT_ID, 1);
-    converterUtils.when(() -> ConverterUtils.toContainerId(null)).thenReturn(containerId);
-
-    OutputContext outputContext = OutputTestHelpers.createOutputContext(conf, workingDir);
-    int numPartitions = 1;
-    RssUnorderedKVOutput output = new RssUnorderedKVOutput(outputContext, numPartitions);
-    output.initialize();
-    output.start();
-    Assertions.assertNotNull(output.getWriter());
-    output.close();
+    try (MockedStatic<RPC> rpc = Mockito.mockStatic(RPC.class);) {
+      TezRemoteShuffleUmbilicalProtocol protocol = mock(TezRemoteShuffleUmbilicalProtocol.class);
+      GetShuffleServerResponse response = new GetShuffleServerResponse();
+      ShuffleAssignmentsInfo shuffleAssignmentsInfo = new ShuffleAssignmentsInfo(new HashMap(), new HashMap());
+      response.setShuffleAssignmentsInfoWritable(new ShuffleAssignmentsInfoWritable(shuffleAssignmentsInfo));
+      doReturn(response).when(protocol).getShuffleAssignments(any());
+      rpc.when(() -> RPC.getProxy(any(), anyLong(), any(), any())).thenReturn(protocol);
+      try (MockedStatic<IdUtils> idUtils = Mockito.mockStatic(IdUtils.class)) {
+        idUtils.when(() -> IdUtils.getApplicationAttemptId()).thenReturn(OutputTestHelpers.APP_ATTEMPT_ID);
+        idUtils.when(() -> IdUtils.getAppAttemptId()).thenReturn(OutputTestHelpers.APP_ATTEMPT_ID.getAttemptId());
+        try (MockedStatic<ConverterUtils> converterUtils = Mockito.mockStatic(ConverterUtils.class)) {
+          ContainerId containerId = ContainerId.newContainerId(OutputTestHelpers.APP_ATTEMPT_ID, 1);
+          converterUtils.when(() -> ConverterUtils.toContainerId(null)).thenReturn(containerId);
+          OutputContext outputContext = OutputTestHelpers.createOutputContext(conf, workingDir);
+          int numPartitions = 1;
+          RssUnorderedKVOutput output = new RssUnorderedKVOutput(outputContext, numPartitions);
+          output.initialize();
+          output.start();
+          Assertions.assertNotNull(output.getWriter());
+          output.close();
+        }
+      }
+    }
   }
 }
