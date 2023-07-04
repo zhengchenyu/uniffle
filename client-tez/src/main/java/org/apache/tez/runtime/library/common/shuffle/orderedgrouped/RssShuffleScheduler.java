@@ -62,8 +62,8 @@ import org.apache.hadoop.conf.Configuration;
 import org.apache.hadoop.io.IntWritable;
 import org.apache.hadoop.io.compress.CompressionCodec;
 import org.apache.hadoop.mapred.JobConf;
+import org.apache.hadoop.yarn.api.records.ApplicationAttemptId;
 import org.apache.tez.common.CallableWithNdc;
-import org.apache.tez.common.IdUtils;
 import org.apache.tez.common.InputContextUtils;
 import org.apache.tez.common.RssTezConfig;
 import org.apache.tez.common.RssTezUtils;
@@ -241,7 +241,7 @@ class RssShuffleScheduler extends ShuffleScheduler {
   private final boolean localDiskFetchEnabled;
   private final String localHostname;
   private final int shufflePort;
-  private final String applicationId;
+  private final ApplicationAttemptId applicationAttemptId;
   private final int dagId;
   private final boolean asyncHttp;
   private final boolean sslShuffle;
@@ -302,7 +302,8 @@ class RssShuffleScheduler extends ShuffleScheduler {
             boolean ifileReadAhead,
             int ifileReadAheadLength,
             String srcNameTrimmed,
-            int shuffleId) throws IOException {
+            int shuffleId,
+            ApplicationAttemptId applicationAttemptId) throws IOException {
     super(inputContext, conf, numberOfInputs, exceptionReporter, mergeManager, allocator, startTime, codec,
             ifileReadAhead, ifileReadAheadLength, srcNameTrimmed);
     this.inputContext = inputContext;
@@ -327,6 +328,7 @@ class RssShuffleScheduler extends ShuffleScheduler {
     this.ifileReadAheadLength = ifileReadAheadLength;
     this.srcNameTrimmed = srcNameTrimmed;
     this.shuffleId = shuffleId;
+    this.applicationAttemptId = applicationAttemptId;
     this.codec = codec;
     int configuredNumFetchers =
             conf.getInt(
@@ -376,7 +378,6 @@ class RssShuffleScheduler extends ShuffleScheduler {
             TezRuntimeConfiguration.TEZ_RUNTIME_SHUFFLE_FAILED_CHECK_SINCE_LAST_COMPLETION,
             TezRuntimeConfiguration.TEZ_RUNTIME_SHUFFLE_FAILED_CHECK_SINCE_LAST_COMPLETION_DEFAULT);
 
-    this.applicationId = IdUtils.getApplicationAttemptId().toString();
     this.dagId = inputContext.getDagIdentifier();
     this.localHostname = inputContext.getExecutionContext().getHostName();
     String auxiliaryService = conf.get(TezConfiguration.TEZ_AM_SHUFFLE_AUXILIARY_SERVICE_ID,
@@ -1578,10 +1579,10 @@ class RssShuffleScheduler extends ShuffleScheduler {
     ShuffleWriteClient writeClient = RssTezUtils.createShuffleClient(conf);
     String clientType = "";
     Roaring64NavigableMap blockIdBitmap = writeClient.getShuffleResult(
-            clientType, shuffleServerInfoSet, applicationId, shuffleId, mapHost.getPartitionId());
+            clientType, shuffleServerInfoSet, applicationAttemptId.toString(), shuffleId, mapHost.getPartitionId());
     writeClient.close();
 
-    int appAttemptId = IdUtils.getAppAttemptId();
+    int appAttemptId = applicationAttemptId.getAttemptId();
     Roaring64NavigableMap taskIdBitmap = RssTezUtils.fetchAllRssTaskIds(
             partitionIdToSuccessMapTaskAttempts.get(mapHost.getPartitionId()), this.numInputs,
             appAttemptId);
@@ -1599,7 +1600,7 @@ class RssShuffleScheduler extends ShuffleScheduler {
       boolean expectedTaskIdsBitmapFilterEnable = shuffleServerInfoSet.size() > 1;
 
       CreateShuffleReadClientRequest request = new CreateShuffleReadClientRequest(
-          applicationId,
+          applicationAttemptId.toString(),
           shuffleId,
           mapHost.getPartitionId(),
           basePath,
@@ -1632,8 +1633,8 @@ class RssShuffleScheduler extends ShuffleScheduler {
             exceptionReporter, jobTokenSecretManager, ifileReadAhead, ifileReadAheadLength,
             codec, conf, localDiskFetchEnabled, localHostname, shufflePort, srcNameTrimmed, mapHost,
             ioErrsCounter, wrongLengthErrsCounter, badIdErrsCounter, wrongMapErrsCounter,
-            connectionErrsCounter, wrongReduceErrsCounter, applicationId, dagId, asyncHttp, sslShuffle,
-            verifyDiskChecksum, compositeFetch);
+            connectionErrsCounter, wrongReduceErrsCounter, applicationAttemptId.toString(), dagId, asyncHttp,
+            sslShuffle, verifyDiskChecksum, compositeFetch);
   }
 
   private class FetchFutureCallback implements FutureCallback<Void> {

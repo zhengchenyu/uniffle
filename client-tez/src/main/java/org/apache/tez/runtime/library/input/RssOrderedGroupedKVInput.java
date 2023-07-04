@@ -33,6 +33,7 @@ import org.apache.hadoop.classification.InterfaceAudience;
 import org.apache.hadoop.classification.InterfaceAudience.Public;
 import org.apache.hadoop.conf.Configuration;
 import org.apache.hadoop.io.RawComparator;
+import org.apache.hadoop.yarn.api.records.ApplicationAttemptId;
 import org.apache.tez.common.RssTezUtils;
 import org.apache.tez.common.TezRuntimeFrameworkConfigs;
 import org.apache.tez.common.TezUtils;
@@ -87,6 +88,7 @@ public class RssOrderedGroupedKVInput extends AbstractLogicalInput {
   protected RssShuffle shuffle;
   protected MemoryUpdateCallbackHandler memoryUpdateCallbackHandler;
   private int shuffleId;
+  private ApplicationAttemptId applicationAttemptId;
   private final BlockingQueue<Event> pendingEvents = new LinkedBlockingQueue<>();
   private long firstEventReceivedTime = -1;
   @SuppressWarnings("rawtypes")
@@ -134,6 +136,8 @@ public class RssOrderedGroupedKVInput extends AbstractLogicalInput {
     assert sourceVertexId != -1;
     assert destinationVertexId != -1;
     this.shuffleId = RssTezUtils.computeShuffleId(tezDAGID.getId(), sourceVertexId, destinationVertexId);
+    this.applicationAttemptId =
+        ApplicationAttemptId.newInstance(getContext().getApplicationId(), getContext().getDAGAttemptNumber());
     return Collections.emptyList();
   }
 
@@ -160,7 +164,7 @@ public class RssOrderedGroupedKVInput extends AbstractLogicalInput {
   @VisibleForTesting
   RssShuffle createRssShuffle() throws IOException {
     return new RssShuffle(getContext(), conf, getNumPhysicalInputs(), memoryUpdateCallbackHandler.getMemoryAssigned(),
-        shuffleId);
+        shuffleId, applicationAttemptId);
   }
 
   /**

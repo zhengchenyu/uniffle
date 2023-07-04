@@ -39,6 +39,7 @@ import org.apache.hadoop.security.Credentials;
 import org.apache.hadoop.security.SecurityUtil;
 import org.apache.hadoop.security.UserGroupInformation;
 import org.apache.hadoop.security.token.Token;
+import org.apache.hadoop.yarn.api.records.ApplicationAttemptId;
 import org.apache.hadoop.yarn.api.records.ApplicationId;
 import org.apache.tez.common.GetShuffleServerRequest;
 import org.apache.tez.common.GetShuffleServerResponse;
@@ -101,6 +102,7 @@ public class RssUnorderedKVOutput extends AbstractLogicalOutput {
   private String taskVertexName;
   private String destinationVertexName;
   private int shuffleId;
+  private ApplicationAttemptId applicationAttemptId;
 
   public RssUnorderedKVOutput(OutputContext outputContext, int numPhysicalOutputs) {
     super(outputContext, numPhysicalOutputs);
@@ -162,6 +164,8 @@ public class RssUnorderedKVOutput extends AbstractLogicalOutput {
     assert sourceVertexId != -1;
     assert destinationVertexId != -1;
     this.shuffleId = RssTezUtils.computeShuffleId(tezDAGID.getId(), sourceVertexId, destinationVertexId);
+    this.applicationAttemptId =
+        ApplicationAttemptId.newInstance(outputContext.getApplicationId(), outputContext.getDAGAttemptNumber());
     GetShuffleServerRequest request = new GetShuffleServerRequest(this.taskAttemptId, this.mapNum,
         this.numOutputs, this.shuffleId);
 
@@ -203,7 +207,7 @@ public class RssUnorderedKVOutput extends AbstractLogicalOutput {
     if (!isStarted.get()) {
       memoryUpdateCallbackHandler.validateUpdateReceived();
       sorter = new RssUnSorter(taskAttemptId, getContext(), conf, mapNum, numOutputs,
-          memoryUpdateCallbackHandler.getMemoryAssigned(), shuffleId,
+          memoryUpdateCallbackHandler.getMemoryAssigned(), shuffleId, applicationAttemptId,
           partitionToServers);
       LOG.info("Initialized RssUnSorter.");
       isStarted.set(true);
