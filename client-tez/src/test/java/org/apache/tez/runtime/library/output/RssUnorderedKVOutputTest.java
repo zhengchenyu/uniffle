@@ -66,6 +66,7 @@ import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyLong;
+import static org.mockito.ArgumentMatchers.anyString;
 import static org.mockito.Mockito.doReturn;
 import static org.mockito.Mockito.mock;
 
@@ -139,6 +140,7 @@ public class RssUnorderedKVOutputTest {
         try (MockedStatic<ConverterUtils> converterUtils = Mockito.mockStatic(ConverterUtils.class)) {
           ContainerId containerId = ContainerId.newContainerId(OutputTestHelpers.APP_ATTEMPT_ID, 1);
           converterUtils.when(() -> ConverterUtils.toContainerId(null)).thenReturn(containerId);
+          converterUtils.when(() -> ConverterUtils.toContainerId(anyString())).thenReturn(containerId);
           OutputContext outputContext = OutputTestHelpers.createOutputContext(conf, workingDir);
           int numPartitions = 1;
           RssUnorderedKVOutput output = new RssUnorderedKVOutput(outputContext, numPartitions);
