@@ -79,7 +79,7 @@ public class RssSorter extends ExternalSorter {
     }
     double sortThreshold = conf.getDouble(RssTezConfig.RSS_CLIENT_SORT_MEMORY_USE_THRESHOLD,
           RssTezConfig.RSS_CLIENT_DEFAULT_SORT_MEMORY_USE_THRESHOLD);
-    long taskAttemptId = RssTezUtils.convertTaskAttemptIdToLong(tezTaskAttemptID, IdUtils.getAppAttemptId());
+    long taskAttemptId = RssTezUtils.convertTaskAttemptIdToLong(tezTaskAttemptID);
 
     long maxSegmentSize = conf.getLong(RssTezConfig.RSS_CLIENT_MAX_BUFFER_SIZE,
           RssTezConfig.RSS_CLIENT_DEFAULT_MAX_BUFFER_SIZE);
