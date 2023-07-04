@@ -487,8 +487,7 @@ class RssShuffleScheduler extends ShuffleScheduler {
   @Override
   public void start() throws Exception {
     TezTaskAttemptID tezTaskAttemptID = InputContextUtils.getTezTaskAttemptID(this.inputContext);
-    this.partitionToServers = UmbilicalUtils.requestShuffleServer(
-        inputContext.getApplicationId(), conf, tezTaskAttemptID, shuffleId);
+    this.partitionToServers = UmbilicalUtils.requestShuffleServer(inputContext, conf, tezTaskAttemptID, shuffleId);
 
     shuffleSchedulerThread = Thread.currentThread();
     RssShuffleSchedulerCallable rssShuffleSchedulerCallable = new RssShuffleSchedulerCallable();

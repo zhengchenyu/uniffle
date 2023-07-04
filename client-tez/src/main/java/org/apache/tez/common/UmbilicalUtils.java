@@ -26,10 +26,16 @@ import java.util.Map;
 import org.apache.hadoop.conf.Configuration;
 import org.apache.hadoop.ipc.RPC;
 import org.apache.hadoop.net.NetUtils;
+import org.apache.hadoop.security.Credentials;
+import org.apache.hadoop.security.SecurityUtil;
 import org.apache.hadoop.security.UserGroupInformation;
+import org.apache.hadoop.security.token.Token;
 import org.apache.hadoop.yarn.api.records.ApplicationId;
+import org.apache.tez.common.security.JobTokenIdentifier;
+import org.apache.tez.common.security.TokenCache;
 import org.apache.tez.dag.api.TezException;
 import org.apache.tez.dag.records.TezTaskAttemptID;
+import org.apache.tez.runtime.api.InputContext;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -56,15 +62,21 @@ public class UmbilicalUtils {
    * @throws TezException
    */
   private static Map<Integer, List<ShuffleServerInfo>> doRequestShuffleServer(
+            InputContext inputContext,
             ApplicationId applicationId,
             Configuration conf,
             TezTaskAttemptID taskAttemptId,
             int shuffleId) throws IOException, InterruptedException, TezException {
-    UserGroupInformation taskOwner = UserGroupInformation.createRemoteUser(applicationId.toString());
-
     String host = conf.get(RSS_AM_SHUFFLE_MANAGER_ADDRESS);
     int port = conf.getInt(RSS_AM_SHUFFLE_MANAGER_PORT, -1);
     final InetSocketAddress address = NetUtils.createSocketAddrForHost(host, port);
+
+    String tokenIdentifier = inputContext.getApplicationId().toString();
+    UserGroupInformation taskOwner = UserGroupInformation.createRemoteUser(tokenIdentifier);
+    Credentials credentials = UserGroupInformation.getCurrentUser().getCredentials();
+    Token<JobTokenIdentifier> jobToken = TokenCache.getSessionToken(credentials);
+    SecurityUtil.setTokenService(jobToken, address);
+    taskOwner.addToken(jobToken);
     TezRemoteShuffleUmbilicalProtocol umbilical = taskOwner
         .doAs(new PrivilegedExceptionAction<TezRemoteShuffleUmbilicalProtocol>() {
           @Override
@@ -86,15 +98,15 @@ public class UmbilicalUtils {
   }
 
   public static Map<Integer, List<ShuffleServerInfo>> requestShuffleServer(
-          ApplicationId applicationId,
+          InputContext inputContext,
           Configuration conf,
           TezTaskAttemptID taskAttemptId,
           int shuffleId) {
     try {
-      return doRequestShuffleServer(applicationId, conf, taskAttemptId,shuffleId);
+      return doRequestShuffleServer(inputContext, inputContext.getApplicationId(), conf, taskAttemptId, shuffleId);
     } catch (IOException | InterruptedException | TezException e) {
       LOG.error("Failed to requestShuffleServer, applicationId:{}, taskAttemptId:{}, shuffleId:{}, worker:{}",
-          applicationId, taskAttemptId, shuffleId, e);
+          inputContext.getApplicationId(), taskAttemptId, shuffleId, e);
     }
     return null;
   }
