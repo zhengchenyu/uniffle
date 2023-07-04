@@ -159,7 +159,7 @@ public class RssDAGAppMaster extends DAGAppMaster {
 
     Token<JobTokenIdentifier> sessionToken = TokenCache.getSessionToken(appMaster.getContext().getAppCredentials());
     appMaster.setTezRemoteShuffleManager(
-        new TezRemoteShuffleManager(strAppAttemptId, sessionToken, conf, strAppAttemptId, client));
+        new TezRemoteShuffleManager(appMaster.getAppID().toString(), sessionToken, conf, strAppAttemptId, client));
     appMaster.getTezRemoteShuffleManager().initialize();
     appMaster.getTezRemoteShuffleManager().start();
 
