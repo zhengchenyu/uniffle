@@ -346,9 +346,8 @@ public class RssShuffleManager extends ShuffleManager {
   @Override
   public void run() throws IOException {
     TezTaskAttemptID tezTaskAttemptId = InputContextUtils.getTezTaskAttemptID(this.inputContext);
-    this.partitionToServers = UmbilicalUtils.requestShuffleServer(
-          this.inputContext.getApplicationId(), this.conf, tezTaskAttemptId, shuffleId);
-
+    this.partitionToServers =
+        UmbilicalUtils.requestShuffleServer(this.inputContext, this.conf, tezTaskAttemptId, shuffleId);
 
     Preconditions.checkState(inputManager != null, "InputManager must be configured");
     if (maxTimeToWaitForReportMillis > 0) {
