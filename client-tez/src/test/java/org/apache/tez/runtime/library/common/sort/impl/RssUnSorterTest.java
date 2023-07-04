@@ -38,6 +38,7 @@ import org.junit.jupiter.api.Test;
 
 import org.apache.uniffle.common.ShuffleServerInfo;
 
+import static org.apache.tez.runtime.library.common.shuffle.impl.RssShuffleManagerTest.APPATTEMPT_ID;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 public class RssUnSorterTest {
@@ -82,7 +83,7 @@ public class RssUnSorterTest {
     int shuffleId = 1001;
 
     RssUnSorter rssSorter = new RssUnSorter(tezTaskAttemptID, outputContext, conf, 5, 5,
-        initialMemoryAvailable, shuffleId, partitionToServers);
+        initialMemoryAvailable, shuffleId, APPATTEMPT_ID, partitionToServers);
 
     rssSorter.collect(new Text("0"), new Text("0"), 0);
     rssSorter.collect(new Text("0"), new Text("1"), 0);

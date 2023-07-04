@@ -66,6 +66,7 @@ import org.apache.hadoop.fs.Path;
 import org.apache.hadoop.fs.RawLocalFileSystem;
 import org.apache.hadoop.io.compress.CompressionCodec;
 import org.apache.hadoop.util.Time;
+import org.apache.hadoop.yarn.api.records.ApplicationAttemptId;
 import org.apache.tez.common.CallableWithNdc;
 import org.apache.tez.common.InputContextUtils;
 import org.apache.tez.common.TezRuntimeFrameworkConfigs;
@@ -113,6 +114,7 @@ public class RssShuffleManager extends ShuffleManager {
   private final InputContext inputContext;
   private final int numInputs;
   private final int shuffleId;
+  private final ApplicationAttemptId applicationAttemptId;
 
   private final DecimalFormat mbpsFormat = new DecimalFormat("0.00");
 
@@ -228,13 +230,15 @@ public class RssShuffleManager extends ShuffleManager {
 
   public RssShuffleManager(InputContext inputContext, Configuration conf, int numInputs,
           int bufferSize, boolean ifileReadAheadEnabled, int ifileReadAheadLength,
-          CompressionCodec codec, FetchedInputAllocator inputAllocator, int shuffleId) throws IOException {
+          CompressionCodec codec, FetchedInputAllocator inputAllocator, int shuffleId,
+          ApplicationAttemptId applicationAttemptId) throws IOException {
     super(inputContext, conf, numInputs, bufferSize, ifileReadAheadEnabled, ifileReadAheadLength, codec,
         inputAllocator);
     this.inputContext = inputContext;
     this.conf = conf;
     this.numInputs = numInputs;
     this.shuffleId = shuffleId;
+    this.applicationAttemptId = applicationAttemptId;
 
     this.shuffledInputsCounter = inputContext.getCounters().findCounter(TaskCounter.NUM_SHUFFLED_INPUTS);
     this.failedShufflesCounter = inputContext.getCounters().findCounter(TaskCounter.NUM_FAILED_SHUFFLE_INPUTS);
@@ -502,7 +506,7 @@ public class RssShuffleManager extends ShuffleManager {
                     partition, partitionToServers.get(partition), partitionToServers);
 
                 RssTezFetcherTask fetcher = new RssTezFetcherTask(RssShuffleManager.this, inputContext,
-                    conf, inputManager, partition, shuffleId, partitionToInput.get(partition),
+                    conf, inputManager, partition, shuffleId, applicationAttemptId, partitionToInput.get(partition),
                     new HashSet<ShuffleServerInfo>(partitionToServers.get(partition)),
                     rssAllBlockIdBitmapMap, rssSuccessBlockIdBitmapMap, numInputs, partitionToServers.size());
                 rssRunningFetchers.add(fetcher);

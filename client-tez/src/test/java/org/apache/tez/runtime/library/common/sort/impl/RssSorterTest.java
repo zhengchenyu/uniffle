@@ -29,6 +29,8 @@ import org.apache.hadoop.fs.FileSystem;
 import org.apache.hadoop.fs.Path;
 import org.apache.hadoop.io.Text;
 import org.apache.hadoop.yarn.api.ApplicationConstants;
+import org.apache.hadoop.yarn.api.records.ApplicationAttemptId;
+import org.apache.hadoop.yarn.api.records.ApplicationId;
 import org.apache.tez.common.TezRuntimeFrameworkConfigs;
 import org.apache.tez.dag.records.TezTaskAttemptID;
 import org.apache.tez.runtime.api.OutputContext;
@@ -77,6 +79,8 @@ public class RssSorterTest {
   public void testCollectAndRecordsPerPartition() throws IOException, InterruptedException {
     TezTaskAttemptID tezTaskAttemptID =
         TezTaskAttemptID.fromString("attempt_1681717153064_3770270_1_00_000000_0");
+    ApplicationAttemptId applicationAttemptId =
+        ApplicationAttemptId.newInstance(ApplicationId.newInstance(1681717153064L, 3770270), 0);
 
     OutputContext outputContext = OutputTestHelpers.createOutputContext(conf, workingDir);
 
@@ -84,7 +88,7 @@ public class RssSorterTest {
     int shuffleId = 1001;
 
     RssSorter rssSorter = new RssSorter(tezTaskAttemptID, outputContext, conf, 5, 5, initialMemoryAvailable,
-        shuffleId, partitionToServers);
+        shuffleId, applicationAttemptId, partitionToServers);
 
     rssSorter.collect(new Text("0"), new Text("0"), 0);
     rssSorter.collect(new Text("0"), new Text("1"), 0);
