@@ -349,6 +349,7 @@ public class RssShuffleManager extends ShuffleManager {
     this.partitionToServers = UmbilicalUtils.requestShuffleServer(
             this.inputContext.getApplicationId(), this.conf, tezTaskAttemptId, shuffleId);
 
+
     Preconditions.checkState(inputManager != null, "InputManager must be configured");
     if (maxTimeToWaitForReportMillis > 0) {
       reporterExecutor = Executors.newSingleThreadExecutor(
