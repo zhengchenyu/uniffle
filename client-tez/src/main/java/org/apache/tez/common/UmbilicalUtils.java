@@ -62,7 +62,6 @@ public class UmbilicalUtils {
    * @throws TezException
    */
   private static Map<Integer, List<ShuffleServerInfo>> doRequestShuffleServer(
-            InputContext inputContext,
             ApplicationId applicationId,
             Configuration conf,
             TezTaskAttemptID taskAttemptId,
@@ -71,8 +70,7 @@ public class UmbilicalUtils {
     int port = conf.getInt(RSS_AM_SHUFFLE_MANAGER_PORT, -1);
     final InetSocketAddress address = NetUtils.createSocketAddrForHost(host, port);
 
-    String tokenIdentifier = inputContext.getApplicationId().toString();
-    UserGroupInformation taskOwner = UserGroupInformation.createRemoteUser(tokenIdentifier);
+    UserGroupInformation taskOwner = UserGroupInformation.createRemoteUser(applicationId.toString());
     Credentials credentials = UserGroupInformation.getCurrentUser().getCredentials();
     Token<JobTokenIdentifier> jobToken = TokenCache.getSessionToken(credentials);
     SecurityUtil.setTokenService(jobToken, address);
@@ -98,15 +96,15 @@ public class UmbilicalUtils {
   }
 
   public static Map<Integer, List<ShuffleServerInfo>> requestShuffleServer(
-          InputContext inputContext,
+          ApplicationId applicationId,
           Configuration conf,
           TezTaskAttemptID taskAttemptId,
           int shuffleId) {
     try {
-      return doRequestShuffleServer(inputContext, inputContext.getApplicationId(), conf, taskAttemptId, shuffleId);
+      return doRequestShuffleServer(applicationId, conf, taskAttemptId, shuffleId);
     } catch (IOException | InterruptedException | TezException e) {
       LOG.error("Failed to requestShuffleServer, applicationId:{}, taskAttemptId:{}, shuffleId:{}, worker:{}",
-          inputContext.getApplicationId(), taskAttemptId, shuffleId, e);
+          applicationId, taskAttemptId, shuffleId, e);
     }
     return null;
   }
