@@ -35,6 +35,7 @@ import org.apache.tez.common.security.JobTokenIdentifier;
 import org.apache.tez.common.security.TokenCache;
 import org.apache.tez.dag.api.TezException;
 import org.apache.tez.dag.records.TezTaskAttemptID;
+import org.apache.uniffle.common.exception.RssException;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -46,7 +47,46 @@ import static org.apache.tez.common.RssTezConfig.RSS_AM_SHUFFLE_MANAGER_PORT;
 public class UmbilicalUtils {
   private static final Logger LOG = LoggerFactory.getLogger(UmbilicalUtils.class);
 
-  private UmbilicalUtils() {}
+  private static UmbilicalUtils INSTANCE;
+  private TezRemoteShuffleUmbilicalProtocol umbilical;
+  private String host;
+  private int port;
+
+  private UmbilicalUtils(Configuration conf, ApplicationId applicationId) {
+    try {
+      this.host = conf.get(RSS_AM_SHUFFLE_MANAGER_ADDRESS);
+      this.port = conf.getInt(RSS_AM_SHUFFLE_MANAGER_PORT, -1);
+      final InetSocketAddress address = NetUtils.createSocketAddrForHost(host, port);
+
+      UserGroupInformation taskOwner =
+          UserGroupInformation.createRemoteUser(applicationId.toString());
+      Credentials credentials = UserGroupInformation.getCurrentUser().getCredentials();
+      Token<JobTokenIdentifier> jobToken = TokenCache.getSessionToken(credentials);
+      SecurityUtil.setTokenService(jobToken, address);
+      taskOwner.addToken(jobToken);
+      this.umbilical =
+          taskOwner.doAs(
+              new PrivilegedExceptionAction<TezRemoteShuffleUmbilicalProtocol>() {
+                @Override
+                public TezRemoteShuffleUmbilicalProtocol run() throws Exception {
+                  return RPC.getProxy(
+                      TezRemoteShuffleUmbilicalProtocol.class,
+                      TezRemoteShuffleUmbilicalProtocol.versionID,
+                      address,
+                      conf);
+                }
+              });
+    } catch (Exception e) {
+      throw new RssException(e);
+    }
+  }
+
+  public static synchronized UmbilicalUtils getInstance(Configuration conf, ApplicationId applicationId) {
+    if (INSTANCE == null) {
+      INSTANCE = new UmbilicalUtils(conf, applicationId);
+    }
+    return INSTANCE;
+  }
 
   /**
    * @param applicationId Application Id of this task
@@ -59,38 +99,16 @@ public class UmbilicalUtils {
    * @throws InterruptedException
    * @throws TezException
    */
-  private static Map<Integer, List<ShuffleServerInfo>> doRequestShuffleServer(
+  private Map<Integer, List<ShuffleServerInfo>> doRequestShuffleServer(
       ApplicationId applicationId,
       Configuration conf,
       TezTaskAttemptID taskAttemptId,
       int shuffleId)
       throws IOException, InterruptedException, TezException {
-    String host = conf.get(RSS_AM_SHUFFLE_MANAGER_ADDRESS);
-    int port = conf.getInt(RSS_AM_SHUFFLE_MANAGER_PORT, -1);
-    final InetSocketAddress address = NetUtils.createSocketAddrForHost(host, port);
-
-    UserGroupInformation taskOwner =
-        UserGroupInformation.createRemoteUser(applicationId.toString());
-    Credentials credentials = UserGroupInformation.getCurrentUser().getCredentials();
-    Token<JobTokenIdentifier> jobToken = TokenCache.getSessionToken(credentials);
-    SecurityUtil.setTokenService(jobToken, address);
-    taskOwner.addToken(jobToken);
-    TezRemoteShuffleUmbilicalProtocol umbilical =
-        taskOwner.doAs(
-            new PrivilegedExceptionAction<TezRemoteShuffleUmbilicalProtocol>() {
-              @Override
-              public TezRemoteShuffleUmbilicalProtocol run() throws Exception {
-                return RPC.getProxy(
-                    TezRemoteShuffleUmbilicalProtocol.class,
-                    TezRemoteShuffleUmbilicalProtocol.versionID,
-                    address,
-                    conf);
-              }
-            });
     GetShuffleServerRequest request =
         new GetShuffleServerRequest(taskAttemptId, 200, 200, shuffleId);
 
-    GetShuffleServerResponse response = umbilical.getShuffleAssignments(request);
+    GetShuffleServerResponse response = this.umbilical.getShuffleAssignments(request);
     Map<Integer, List<ShuffleServerInfo>> partitionToServers =
         response
             .getShuffleAssignmentsInfoWritable()
@@ -107,7 +125,7 @@ public class UmbilicalUtils {
     return partitionToServers;
   }
 
-  public static Map<Integer, List<ShuffleServerInfo>> requestShuffleServer(
+  public Map<Integer, List<ShuffleServerInfo>> requestShuffleServer(
       ApplicationId applicationId,
       Configuration conf,
       TezTaskAttemptID taskAttemptId,
@@ -123,5 +141,12 @@ public class UmbilicalUtils {
           e);
     }
     return null;
+  }
+
+  public void reportShuffleFetchFailure(String appId, int shuffleId, int stageAttemptId, int partitionId, 
+                                               String exception) throws IOException {
+    RssReportShuffleFetchFailureRequest request =
+        new RssReportShuffleFetchFailureRequest(appId, shuffleId, stageAttemptId, partitionId, exception);
+    this.umbilical.reportShuffleFetchFailure(request);
   }
 }

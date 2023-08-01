@@ -17,6 +17,8 @@
 
 package org.apache.tez.runtime.library.common.shuffle.impl;
 
+import static org.apache.tez.common.RssTezConfig.RSS_SHUFFLE_VERTEX_ATTEMPT_ID;
+
 import java.io.IOException;
 import java.io.InputStream;
 import java.io.OutputStream;
@@ -66,6 +68,7 @@ import org.apache.hadoop.fs.RawLocalFileSystem;
 import org.apache.hadoop.io.compress.CompressionCodec;
 import org.apache.hadoop.util.Time;
 import org.apache.hadoop.yarn.api.records.ApplicationAttemptId;
+import org.apache.hadoop.yarn.api.records.ApplicationId;
 import org.apache.tez.common.CallableWithNdc;
 import org.apache.tez.common.InputContextUtils;
 import org.apache.tez.common.TezRuntimeFrameworkConfigs;
@@ -95,6 +98,11 @@ import org.apache.tez.runtime.library.common.shuffle.InputHost;
 import org.apache.tez.runtime.library.common.shuffle.InputHost.PartitionToInputs;
 import org.apache.tez.runtime.library.common.shuffle.ShuffleUtils;
 import org.apache.tez.runtime.library.common.shuffle.ShuffleUtils.FetchStatsLogger;
+import org.apache.uniffle.client.api.ShuffleManagerClient;
+import org.apache.uniffle.client.request.RssReportShuffleFetchFailureRequest;
+import org.apache.uniffle.client.response.RssReportShuffleFetchFailureResponse;
+import org.apache.uniffle.common.exception.RssException;
+import org.apache.uniffle.common.exception.RssFetchFailedException;
 import org.roaringbitmap.longlong.Roaring64NavigableMap;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -114,6 +122,7 @@ public class RssShuffleManager extends ShuffleManager {
   private final int numInputs;
   private final int shuffleId;
   private final ApplicationAttemptId applicationAttemptId;
+  private final int vertexAttemptId;
 
   private final DecimalFormat mbpsFormat = new DecimalFormat("0.00");
 
@@ -243,6 +252,8 @@ public class RssShuffleManager extends ShuffleManager {
     this.numInputs = numInputs;
     this.shuffleId = shuffleId;
     this.applicationAttemptId = applicationAttemptId;
+    this.vertexAttemptId = this.conf.getInt(RSS_SHUFFLE_VERTEX_ATTEMPT_ID, 0);
+    LOG.info("vertex attempt id is {}", this.vertexAttemptId);
 
     this.shuffledInputsCounter =
         inputContext.getCounters().findCounter(TaskCounter.NUM_SHUFFLED_INPUTS);
@@ -404,7 +415,7 @@ public class RssShuffleManager extends ShuffleManager {
   public void run() throws IOException {
     TezTaskAttemptID tezTaskAttemptId = InputContextUtils.getTezTaskAttemptID(this.inputContext);
     this.partitionToServers =
-        UmbilicalUtils.requestShuffleServer(
+        UmbilicalUtils.getInstance(this.conf, this.inputContext.getApplicationId()).requestShuffleServer(
             this.inputContext.getApplicationId(), this.conf, tezTaskAttemptId, shuffleId);
 
     Preconditions.checkState(inputManager != null, "InputManager must be configured");
@@ -1426,6 +1437,16 @@ public class RssShuffleManager extends ShuffleManager {
 
     @Override
     public void onFailure(Throwable t) {
+      if (t instanceof RssFetchFailedException) {
+        try {
+          LOG.error("report fetch fail exception, caused by {}", t);
+          UmbilicalUtils.getInstance(conf, inputContext.getApplicationId())
+              .reportShuffleFetchFailure(inputContext.getApplicationId().toString(), shuffleId, vertexAttemptId,
+                  fetcher.getPartitionId(), t.getMessage());
+        } catch (Exception e) {
+          LOG.info("report shuffle fetch failures failed, caused by {}", e);
+        }        
+      }
       // Unsuccessful - the fetcher may not have shutdown correctly. Try shutting it down.
       fetcher.shutdown();
       if (isShutdown.get()) {

@@ -38,6 +38,9 @@ import org.apache.hadoop.security.authorize.PolicyProvider;
 import org.apache.hadoop.security.token.Token;
 import org.apache.tez.common.GetShuffleServerRequest;
 import org.apache.tez.common.GetShuffleServerResponse;
+import org.apache.tez.common.RssReportShuffleFetchFailureRequest;
+import org.apache.tez.common.RssReportShuffleFetchFailureResponse;
+import org.apache.tez.common.RssShuffleStatus;
 import org.apache.tez.common.RssTezConfig;
 import org.apache.tez.common.RssTezUtils;
 import org.apache.tez.common.ServicePluginLifecycle;
@@ -48,7 +51,10 @@ import org.apache.tez.common.security.JobTokenSecretManager;
 import org.apache.tez.dag.api.TezConfiguration;
 import org.apache.tez.dag.api.TezException;
 import org.apache.tez.dag.api.TezUncheckedException;
+import org.apache.tez.dag.app.dag.event.DAGEventInternalError;
 import org.apache.tez.dag.app.security.authorize.RssTezAMPolicyProvider;
+import org.apache.uniffle.common.rpc.StatusCode;
+import org.apache.uniffle.common.util.JavaUtils;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -83,13 +89,14 @@ public class TezRemoteShuffleManager implements ServicePluginLifecycle {
       Token<JobTokenIdentifier> sessionToken,
       Configuration conf,
       String appId,
-      ShuffleWriteClient rssClient) {
+      ShuffleWriteClient rssClient,
+      RssDAGAppMaster appMaster) {
     this.tokenIdentifier = tokenIdentifier;
     this.sessionToken = sessionToken;
     this.conf = conf;
     this.appId = appId;
     this.rssClient = rssClient;
-    this.tezRemoteShuffleUmbilical = new TezRemoteShuffleUmbilicalProtocolImpl();
+    this.tezRemoteShuffleUmbilical = new TezRemoteShuffleUmbilicalProtocolImpl(conf, appId, appMaster);
   }
 
   @Override
@@ -110,7 +117,25 @@ public class TezRemoteShuffleManager implements ServicePluginLifecycle {
   }
 
   private class TezRemoteShuffleUmbilicalProtocolImpl implements TezRemoteShuffleUmbilicalProtocol {
+
+    private Configuration conf;
+    private String appId;
+    private int maxFetchFailuresPerPartition;
+    private int maxFetchFailures;
+
     private Map<Integer, ShuffleAssignmentsInfo> shuffleIdToShuffleAssignsInfo = new HashMap<>();
+    private final Map<Integer, RssShuffleStatus> shuffleStatus = JavaUtils.newConcurrentMap();
+    RssDAGAppMaster rssDAGAppMaster;
+
+    TezRemoteShuffleUmbilicalProtocolImpl(Configuration conf, String appId, RssDAGAppMaster rssDAGAppMaster) {
+      this.appId = appId;
+      this.conf = conf;
+      this.maxFetchFailuresPerPartition = conf.getInt(TezConfiguration.TEZ_AM_TASK_MAX_FAILED_ATTEMPTS,
+          TezConfiguration.TEZ_AM_TASK_MAX_FAILED_ATTEMPTS_DEFAULT);
+      this.maxFetchFailures = conf.getInt(TezConfiguration.TEZ_TASK_MAX_ALLOWED_OUTPUT_FAILURES,
+          TezConfiguration.TEZ_TASK_MAX_ALLOWED_OUTPUT_FAILURES_DEFAULT);
+      this.rssDAGAppMaster = rssDAGAppMaster;
+    }
 
     @Override
     public long getProtocolVersion(String s, long l) throws IOException {
@@ -165,6 +190,62 @@ public class TezRemoteShuffleManager implements ServicePluginLifecycle {
       }
 
       return response;
+    }
+
+    @Override
+    public RssReportShuffleFetchFailureResponse reportShuffleFetchFailure(RssReportShuffleFetchFailureRequest request)
+        throws IOException {
+      String appId = request.getAppId();
+      int vertexAttempt = request.getVertexAttemptId();
+      int partitionId = request.getPartitionId();
+      StatusCode code;
+      String msg ;
+      if (!appId.equals(this.appId)) {
+        msg = String.format("got a wrong shuffle fetch failure report from appId: %s, expected appId: %s", appId,
+            this.appId);
+        LOG.warn(msg);
+        code = StatusCode.INVALID_REQUEST;
+      } else {
+        RssShuffleStatus status =
+            shuffleStatus.computeIfAbsent(
+                request.getShuffleId(),
+                key -> {
+                  int partitionNum = shuffleIdToShuffleAssignsInfo.get(key).getPartitionToServers().size();
+                  return new RssShuffleStatus(partitionNum, vertexAttempt);
+                });
+        int c = status.resetVertexAttemptIfNecessary(vertexAttempt);
+        if (c == 1) {
+          // update vertex attempt id
+          rssDAGAppMaster.updateVertexAttemptForCurrentDag(status.getVertexAttempt());
+        }
+        if (c < 0) {
+          msg =
+              String.format(
+                  "got an old vertex(%d vs %d) shuffle fetch failure report, which should be impossible.",
+                  status.getVertexAttempt(), vertexAttempt);
+          LOG.warn(msg);
+          code = StatusCode.INVALID_REQUEST;
+        } else { // update the stage partition fetch failure count
+          code = StatusCode.SUCCESS;
+          status.incPartitionFetchFailure(vertexAttempt, partitionId);
+          int fetchFailureNumPerPartition = status.getPartitionFetchFailureNum(vertexAttempt, partitionId);
+          int totalFetchFailureNum = status.getTotalFetchFailureNum(vertexAttempt);
+          if (fetchFailureNumPerPartition >= this.maxFetchFailuresPerPartition ||
+              totalFetchFailureNum > this.maxFetchFailures) {
+            msg = String.format(
+                "report shuffle fetch failure as (%d,%d) excceed maximum number(%d,%d) of shuffle fetch",
+                fetchFailureNumPerPartition, totalFetchFailureNum, this.maxFetchFailuresPerPartition,
+                this.maxFetchFailures);
+            // For now, just fail the application
+            rssDAGAppMaster.getDispatcher().getEventHandler()
+                .handle(new DAGEventInternalError(rssDAGAppMaster.getContext().getCurrentDAGID(), msg));
+            // TODO: recompute all task of upstream vertex.
+          } else {
+            msg = "don't report shuffle fetch failure";
+          }
+        }        
+      }
+      return new RssReportShuffleFetchFailureResponse(code, msg);
     }
   }
 

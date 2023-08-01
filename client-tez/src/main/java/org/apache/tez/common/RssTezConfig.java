@@ -200,6 +200,8 @@ public class RssTezConfig {
       TEZ_RSS_CONFIG_PREFIX + "rss.shuffle.source.vertex.id";
   public static final String RSS_SHUFFLE_DESTINATION_VERTEX_ID =
       TEZ_RSS_CONFIG_PREFIX + "rss.shuffle.destination.vertex.id";
+  public static final String RSS_SHUFFLE_VERTEX_ATTEMPT_ID =
+      TEZ_RSS_CONFIG_PREFIX + "rss.shuffle.vertex.attempt.id";
 
   public static RssConf toRssConf(Configuration jobConf) {
     RssConf rssConf = new RssConf();

@@ -44,6 +44,8 @@ import java.util.concurrent.atomic.AtomicInteger;
 import java.util.concurrent.atomic.AtomicLong;
 import javax.crypto.SecretKey;
 
+import static org.apache.tez.common.RssTezConfig.RSS_SHUFFLE_VERTEX_ATTEMPT_ID;
+
 import com.google.common.annotations.VisibleForTesting;
 import com.google.common.base.Preconditions;
 import com.google.common.collect.LinkedListMultimap;
@@ -89,6 +91,7 @@ import org.apache.tez.runtime.library.common.shuffle.ShuffleUtils;
 import org.apache.tez.runtime.library.common.shuffle.ShuffleUtils.FetchStatsLogger;
 import org.apache.tez.runtime.library.common.shuffle.orderedgrouped.MapHost.HostPortPartition;
 import org.apache.tez.runtime.library.common.shuffle.orderedgrouped.MapOutput.Type;
+import org.apache.uniffle.common.exception.RssFetchFailedException;
 import org.roaringbitmap.longlong.Roaring64NavigableMap;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -238,6 +241,7 @@ class RssShuffleScheduler extends ShuffleScheduler {
   private final boolean asyncHttp;
   private final boolean sslShuffle;
   private final int shuffleId;
+  private final int vertexAttemptId;
 
   private final TezCounter ioErrsCounter;
   private final TezCounter wrongLengthErrsCounter;
@@ -333,6 +337,7 @@ class RssShuffleScheduler extends ShuffleScheduler {
     this.srcNameTrimmed = srcNameTrimmed;
     this.shuffleId = shuffleId;
     this.applicationAttemptId = applicationAttemptId;
+    this.vertexAttemptId = this.conf.getInt(RSS_SHUFFLE_VERTEX_ATTEMPT_ID, 0);
     this.codec = codec;
     int configuredNumFetchers =
         conf.getInt(
@@ -576,7 +581,7 @@ class RssShuffleScheduler extends ShuffleScheduler {
   public void start() throws Exception {
     TezTaskAttemptID tezTaskAttemptID = InputContextUtils.getTezTaskAttemptID(this.inputContext);
     this.partitionToServers =
-        UmbilicalUtils.requestShuffleServer(
+        UmbilicalUtils.getInstance(this.conf, this.inputContext.getApplicationId()).requestShuffleServer(
             inputContext.getApplicationId(), conf, tezTaskAttemptID, shuffleId);
 
     shuffleSchedulerThread = Thread.currentThread();
@@ -1743,8 +1748,17 @@ class RssShuffleScheduler extends ShuffleScheduler {
 
                 if (isFirstRssPartitionFetch(mapHost)) {
                   int partitionId = mapHost.getPartitionId();
-                  RssTezShuffleDataFetcher rssTezShuffleDataFetcher =
-                      constructRssFetcherForPartition(mapHost, partitionToServers.get(partitionId));
+                  RssTezShuffleDataFetcher rssTezShuffleDataFetcher;
+                  try {
+                    rssTezShuffleDataFetcher =
+                        constructRssFetcherForPartition(mapHost, partitionToServers.get(partitionId));
+                  } catch (RssFetchFailedException e) {
+                    LOG.error("report fetch fail exception, caused by {}", e);
+                    UmbilicalUtils.getInstance(conf, inputContext.getApplicationId())
+                        .reportShuffleFetchFailure(inputContext.getApplicationId().toString(), shuffleId, vertexAttemptId,
+                            partitionId, e.getMessage());          
+                    throw e;
+                  }
 
                   rssRunningFetchers.add(rssTezShuffleDataFetcher);
                   ListenableFuture<Void> future = fetcherExecutor.submit(rssTezShuffleDataFetcher);
@@ -1955,6 +1969,16 @@ class RssShuffleScheduler extends ShuffleScheduler {
     @Override
     public void onFailure(Throwable t) {
       LOG.error("Failed to fetch.", t);
+      if (t instanceof RssFetchFailedException) {
+        try {
+          LOG.error("report fetch fail exception, caused by {}", t);
+          UmbilicalUtils.getInstance(conf, inputContext.getApplicationId())
+              .reportShuffleFetchFailure(inputContext.getApplicationId().toString(), shuffleId, vertexAttemptId,
+                  rssFetcherOrderedGrouped.getPartitionId(), t.getMessage());
+        } catch (IOException e) {
+          LOG.info("report shuffle fetch failures failed, caused by {}", e);
+        }        
+      }
       rssFetcherOrderedGrouped.shutDown();
       if (isShutdown.get()) {
         LOG.info(srcNameTrimmed + ": " + "Already shutdown. Ignoring fetch complete");

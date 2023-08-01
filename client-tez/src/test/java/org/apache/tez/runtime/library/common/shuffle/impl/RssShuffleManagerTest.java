@@ -141,9 +141,11 @@ public class RssShuffleManagerTest {
       try (MockedStatic<UmbilicalUtils> umbilicalUtils = Mockito.mockStatic(UmbilicalUtils.class)) {
         Map<Integer, List<ShuffleServerInfo>> workers = new HashMap<>();
         workers.put(1, ImmutableList.of(new ShuffleServerInfo("127.0.0.1", 2181)));
+        UmbilicalUtils object = mock(UmbilicalUtils.class);
+        when(object.requestShuffleServer(any(), any(), any(), anyInt())).thenReturn(workers);
         umbilicalUtils
-            .when(() -> UmbilicalUtils.requestShuffleServer(any(), any(), any(), anyInt()))
-            .thenReturn(workers);
+            .when(() -> UmbilicalUtils.getInstance(any(), any()))
+            .thenReturn(object);
 
         InputContext inputContext = createInputContext();
         createShuffleManager(inputContext, 2);
@@ -171,11 +173,10 @@ public class RssShuffleManagerTest {
                       Mockito.mockStatic(UmbilicalUtils.class)) {
                     Map<Integer, List<ShuffleServerInfo>> workers = new HashMap<>();
                     workers.put(1, ImmutableList.of(new ShuffleServerInfo("127.0.0.1", 2181)));
+                    UmbilicalUtils object = mock(UmbilicalUtils.class);
+                    when(object.requestShuffleServer(any(), any(), any(), anyInt())).thenReturn(workers);
                     umbilicalUtils
-                        .when(
-                            () ->
-                                UmbilicalUtils.requestShuffleServer(any(), any(), any(), anyInt()))
-                        .thenReturn(workers);
+                        .when(() -> UmbilicalUtils.getInstance(any(), any())).thenReturn(object);
                     try {
                       shuffleManager.run();
                     } catch (Exception e) {
@@ -212,11 +213,12 @@ public class RssShuffleManagerTest {
                       Mockito.mockStatic(UmbilicalUtils.class)) {
                     Map<Integer, List<ShuffleServerInfo>> workers = new HashMap<>();
                     workers.put(1, ImmutableList.of(new ShuffleServerInfo("127.0.0.1", 2181)));
+                    UmbilicalUtils object = mock(UmbilicalUtils.class);
+                    when(object.requestShuffleServer(any(), any(), any(), anyInt())).thenReturn(workers);
                     umbilicalUtils
                         .when(
                             () ->
-                                UmbilicalUtils.requestShuffleServer(any(), any(), any(), anyInt()))
-                        .thenReturn(workers);
+                                UmbilicalUtils.getInstance(any(), any())).thenReturn(object);
                     try {
                       shuffleManager.run();
                     } catch (Exception e) {

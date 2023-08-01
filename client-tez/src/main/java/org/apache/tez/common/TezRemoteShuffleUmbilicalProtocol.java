@@ -38,4 +38,7 @@ public interface TezRemoteShuffleUmbilicalProtocol extends VersionedProtocol {
 
   GetShuffleServerResponse getShuffleAssignments(GetShuffleServerRequest request)
       throws IOException, TezException;
+
+  RssReportShuffleFetchFailureResponse reportShuffleFetchFailure(RssReportShuffleFetchFailureRequest request)
+      throws IOException;
 }

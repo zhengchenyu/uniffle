@@ -78,6 +78,7 @@ import static org.apache.tez.common.RssTezConfig.RSS_AM_SHUFFLE_MANAGER_ADDRESS;
 import static org.apache.tez.common.RssTezConfig.RSS_AM_SHUFFLE_MANAGER_PORT;
 import static org.apache.tez.common.RssTezConfig.RSS_SHUFFLE_DESTINATION_VERTEX_ID;
 import static org.apache.tez.common.RssTezConfig.RSS_SHUFFLE_SOURCE_VERTEX_ID;
+import static org.apache.tez.common.RssTezConfig.RSS_SHUFFLE_VERTEX_ATTEMPT_ID;
 
 public class RssDAGAppMaster extends DAGAppMaster {
   private static final Logger LOG = LoggerFactory.getLogger(RssDAGAppMaster.class);
@@ -189,7 +190,7 @@ public class RssDAGAppMaster extends DAGAppMaster {
         TokenCache.getSessionToken(appMaster.getContext().getAppCredentials());
     appMaster.setTezRemoteShuffleManager(
         new TezRemoteShuffleManager(
-            appMaster.getAppID().toString(), sessionToken, conf, strAppAttemptId, client));
+            appMaster.getAppID().toString(), sessionToken, conf, strAppAttemptId, client, appMaster));
     appMaster.getTezRemoteShuffleManager().initialize();
     appMaster.getTezRemoteShuffleManager().start();
 
@@ -483,5 +484,20 @@ public class RssDAGAppMaster extends DAGAppMaster {
     URL url = Loader.getResource(configurationOptionStr);
     OptionConverter.selectAndConfigure(
         url, configuratorClassName, LogManager.getLoggerRepository());
+  }
+  
+  public void updateVertexAttemptForCurrentDag(int vertexAttemptId) throws IOException {
+    DAGImpl dag = (DAGImpl) getPrivateField(this, "currentDAG");
+    Map<String, Edge> edges = (Map<String, Edge>) getPrivateField(dag, "edges");
+    for (Map.Entry<String, Edge> entry : edges.entrySet()) {
+      Edge edge = entry.getValue();
+      Configuration edgeSourceConf =
+          TezUtils.createConfFromUserPayload(
+              edge.getEdgeProperty().getEdgeSource().getUserPayload());
+      edgeSourceConf.setInt(RSS_SHUFFLE_VERTEX_ATTEMPT_ID, vertexAttemptId);
+      edge.getEdgeProperty()
+          .getEdgeSource()
+          .setUserPayload(TezUtils.createUserPayloadFromConf(edgeSourceConf));
+    }
   }
 }
