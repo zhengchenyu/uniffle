@@ -21,6 +21,7 @@ import java.io.File;
 import java.io.FileInputStream;
 import java.io.IOException;
 import java.nio.ByteBuffer;
+import java.nio.channels.FileChannel;
 import java.util.Iterator;
 import java.util.LinkedHashMap;
 import java.util.Map;
@@ -28,7 +29,6 @@ import java.util.concurrent.locks.ReentrantLock;
 
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
-import sun.nio.ch.FileChannelImpl;
 
 import org.apache.uniffle.common.netty.buffer.FileSegmentManagedBuffer;
 import org.apache.uniffle.common.serializer.PartialInputStream;
@@ -42,7 +42,7 @@ public class BlockFlushFileReader {
 
   private String dataFile;
   private FileInputStream dataInput;
-  private FileChannelImpl dataFileChannel;
+  private FileChannel dataFileChannel;
   boolean stop = false;
 
   // blockid -> BlockInputStream
@@ -69,7 +69,7 @@ public class BlockFlushFileReader {
     loadShuffleIndex(indexFile);
     this.dataFile = dataFile;
     this.dataInput = new FileInputStream(dataFile);
-    this.dataFileChannel = (FileChannelImpl) dataInput.getChannel();
+    this.dataFileChannel = dataInput.getChannel();
     // Avoid flushFileReader noop loop
     this.lock.lock();
     this.flushFileReader = new FlushFileReader();
