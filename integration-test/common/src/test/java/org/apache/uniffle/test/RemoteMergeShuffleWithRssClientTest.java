@@ -66,6 +66,7 @@ import org.apache.uniffle.coordinator.CoordinatorConf;
 import org.apache.uniffle.server.ShuffleServerConf;
 import org.apache.uniffle.storage.util.StorageType;
 
+import static org.apache.uniffle.coordinator.CoordinatorConf.COORDINATOR_DYNAMIC_CLIENT_CONF_ENABLED;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 
 public class RemoteMergeShuffleWithRssClientTest extends ShuffleReadWriteBase {
@@ -79,6 +80,7 @@ public class RemoteMergeShuffleWithRssClientTest extends ShuffleReadWriteBase {
   @BeforeAll
   public static void setupServers(@TempDir File tmpDir) throws Exception {
     CoordinatorConf coordinatorConf = getCoordinatorConf();
+    coordinatorConf.setBoolean(COORDINATOR_DYNAMIC_CLIENT_CONF_ENABLED, false);
     createCoordinatorServer(coordinatorConf);
     ShuffleServerConf shuffleServerConf = getShuffleServerConf(ServerType.GRPC);
     shuffleServerConf.set(ShuffleServerConf.SERVER_MERGE_ENABLE, true);
