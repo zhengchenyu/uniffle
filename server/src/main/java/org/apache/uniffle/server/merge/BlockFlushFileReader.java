@@ -28,12 +28,13 @@ import java.util.concurrent.locks.ReentrantLock;
 
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
-import sun.nio.ch.FileChannelImpl;
 
 import org.apache.uniffle.common.netty.buffer.FileSegmentManagedBuffer;
 import org.apache.uniffle.common.serializer.PartialInputStream;
 import org.apache.uniffle.common.util.JavaUtils;
 import org.apache.uniffle.storage.common.FileBasedShuffleSegment;
+
+import sun.nio.ch.FileChannelImpl;
 
 public class BlockFlushFileReader {
 
