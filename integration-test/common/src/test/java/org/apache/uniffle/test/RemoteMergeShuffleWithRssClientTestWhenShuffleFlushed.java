@@ -19,6 +19,7 @@ package org.apache.uniffle.test;
 
 import java.io.File;
 import java.io.IOException;
+import java.net.ServerSocket;
 import java.util.ArrayList;
 import java.util.Comparator;
 import java.util.HashMap;
@@ -76,7 +77,7 @@ public class RemoteMergeShuffleWithRssClientTestWhenShuffleFlushed extends Shuff
   private static final int SHUFFLE_ID = 0;
   private static final int PARTITION_ID = 0;
 
-  private static ShuffleServerInfo shuffleServerInfo1;
+  private static ShuffleServerInfo shuffleServerInfo;
   private ShuffleWriteClientImpl shuffleWriteClientImpl;
 
   @BeforeAll
@@ -96,18 +97,30 @@ public class RemoteMergeShuffleWithRssClientTestWhenShuffleFlushed extends Shuff
     String basePath = dataDir1.getAbsolutePath() + "," + dataDir2.getAbsolutePath();
     shuffleServerConf.setString("rss.storage.type", StorageType.LOCALFILE.name());
     shuffleServerConf.setString("rss.storage.basePath", basePath);
-    createShuffleServer(shuffleServerConf);
-    File dataDir3 = new File(tmpDir, "data3");
-    File dataDir4 = new File(tmpDir, "data4");
-    basePath = dataDir3.getAbsolutePath() + "," + dataDir4.getAbsolutePath();
-    shuffleServerConf.setString("rss.storage.basePath", basePath);
-    shuffleServerConf.setInteger("rss.rpc.server.port", SHUFFLE_SERVER_INITIAL_PORT + 1);
-    shuffleServerConf.setInteger("rss.jetty.http.port", 18081);
+    List<Integer> ports = findAvailablePorts(2);
+    shuffleServerConf.setInteger("rss.rpc.server.port", ports.get(0));
+    shuffleServerConf.setInteger("rss.jetty.http.port", ports.get(1));
     createShuffleServer(shuffleServerConf);
     startServers();
-    shuffleServerInfo1 =
-        new ShuffleServerInfo(
-            "127.0.0.1-20001", grpcShuffleServers.get(0).getIp(), SHUFFLE_SERVER_INITIAL_PORT);
+    shuffleServerInfo =
+        new ShuffleServerInfo("127.0.0.1-20001", grpcShuffleServers.get(0).getIp(), ports.get(0));
+  }
+
+  private static List<Integer> findAvailablePorts(int num) throws IOException {
+    List<ServerSocket> sockets = new ArrayList<>();
+    List<Integer> ports = new ArrayList<>();
+
+    for (int i = 0; i < num; i++) {
+      ServerSocket socket = new ServerSocket(0);
+      ports.add(socket.getLocalPort());
+      sockets.add(socket);
+    }
+
+    for (ServerSocket socket : sockets) {
+      socket.close();
+    }
+
+    return ports;
   }
 
   @BeforeEach
@@ -157,7 +170,7 @@ public class RemoteMergeShuffleWithRssClientTestWhenShuffleFlushed extends Shuff
     // 2 register shuffle
     String testAppId = "remoteMergeWriteReadTest" + classes;
     shuffleWriteClientImpl.registerShuffle(
-        shuffleServerInfo1,
+        shuffleServerInfo,
         testAppId,
         SHUFFLE_ID,
         Lists.newArrayList(new PartitionRange(0, 0)),
@@ -181,7 +194,7 @@ public class RemoteMergeShuffleWithRssClientTestWhenShuffleFlushed extends Shuff
             layout,
             0,
             PARTITION_ID,
-            Lists.newArrayList(shuffleServerInfo1),
+            Lists.newArrayList(shuffleServerInfo),
             keyClass,
             valueClass,
             0,
@@ -194,7 +207,7 @@ public class RemoteMergeShuffleWithRssClientTestWhenShuffleFlushed extends Shuff
             layout,
             0,
             PARTITION_ID,
-            Lists.newArrayList(shuffleServerInfo1),
+            Lists.newArrayList(shuffleServerInfo),
             keyClass,
             valueClass,
             2,
@@ -207,7 +220,7 @@ public class RemoteMergeShuffleWithRssClientTestWhenShuffleFlushed extends Shuff
             layout,
             0,
             PARTITION_ID,
-            Lists.newArrayList(shuffleServerInfo1),
+            Lists.newArrayList(shuffleServerInfo),
             keyClass,
             valueClass,
             4,
@@ -223,7 +236,7 @@ public class RemoteMergeShuffleWithRssClientTestWhenShuffleFlushed extends Shuff
             layout,
             1,
             PARTITION_ID,
-            Lists.newArrayList(shuffleServerInfo1),
+            Lists.newArrayList(shuffleServerInfo),
             keyClass,
             valueClass,
             1,
@@ -236,7 +249,7 @@ public class RemoteMergeShuffleWithRssClientTestWhenShuffleFlushed extends Shuff
             layout,
             1,
             PARTITION_ID,
-            Lists.newArrayList(shuffleServerInfo1),
+            Lists.newArrayList(shuffleServerInfo),
             keyClass,
             valueClass,
             3,
@@ -245,7 +258,7 @@ public class RemoteMergeShuffleWithRssClientTestWhenShuffleFlushed extends Shuff
             1));
     shuffleWriteClientImpl.sendShuffleData(testAppId, blocks2, () -> false);
     Map<Integer, List<ShuffleServerInfo>> partitionToServers =
-        ImmutableMap.of(PARTITION_ID, Lists.newArrayList(shuffleServerInfo1));
+        ImmutableMap.of(PARTITION_ID, Lists.newArrayList(shuffleServerInfo));
 
     // 4 report shuffle result
     Map<Integer, Set<Long>> ptb = ImmutableMap.of(PARTITION_ID, new HashSet());
@@ -254,7 +267,7 @@ public class RemoteMergeShuffleWithRssClientTestWhenShuffleFlushed extends Shuff
     ptb.get(PARTITION_ID)
         .addAll(blocks2.stream().map(s -> s.getBlockId()).collect(Collectors.toList()));
     Map<ShuffleServerInfo, Map<Integer, Set<Long>>> serverToPartitionToBlockIds = new HashMap();
-    serverToPartitionToBlockIds.put(shuffleServerInfo1, ptb);
+    serverToPartitionToBlockIds.put(shuffleServerInfo, ptb);
     shuffleWriteClientImpl.reportShuffleResult(
         serverToPartitionToBlockIds, testAppId, SHUFFLE_ID, 0, 1);
     shuffleWriteClientImpl.reportShuffleResult(
@@ -264,11 +277,11 @@ public class RemoteMergeShuffleWithRssClientTestWhenShuffleFlushed extends Shuff
     Roaring64NavigableMap uniqueBlockIds = Roaring64NavigableMap.bitmapOf();
     ptb.get(PARTITION_ID).stream().forEach(block -> uniqueBlockIds.add(block));
     shuffleWriteClientImpl.reportUniqueBlocks(
-        Sets.newHashSet(shuffleServerInfo1), testAppId, SHUFFLE_ID, PARTITION_ID, uniqueBlockIds);
+        Sets.newHashSet(shuffleServerInfo), testAppId, SHUFFLE_ID, PARTITION_ID, uniqueBlockIds);
 
     // 6 read result
     Map<Integer, List<ShuffleServerInfo>> serverInfoMap =
-        ImmutableMap.of(PARTITION_ID, Lists.newArrayList(shuffleServerInfo1));
+        ImmutableMap.of(PARTITION_ID, Lists.newArrayList(shuffleServerInfo));
     RMRecordsReader reader =
         new RMRecordsReader(
             testAppId,
@@ -322,7 +335,7 @@ public class RemoteMergeShuffleWithRssClientTestWhenShuffleFlushed extends Shuff
     // 2 register shuffle
     String testAppId = "remoteMergeWriteReadTestWithCombine" + classes;
     shuffleWriteClientImpl.registerShuffle(
-        shuffleServerInfo1,
+        shuffleServerInfo,
         testAppId,
         SHUFFLE_ID,
         Lists.newArrayList(new PartitionRange(0, 0)),
@@ -347,7 +360,7 @@ public class RemoteMergeShuffleWithRssClientTestWhenShuffleFlushed extends Shuff
             layout,
             0,
             PARTITION_ID,
-            Lists.newArrayList(shuffleServerInfo1),
+            Lists.newArrayList(shuffleServerInfo),
             keyClass,
             valueClass,
             0,
@@ -360,7 +373,7 @@ public class RemoteMergeShuffleWithRssClientTestWhenShuffleFlushed extends Shuff
             layout,
             0,
             PARTITION_ID,
-            Lists.newArrayList(shuffleServerInfo1),
+            Lists.newArrayList(shuffleServerInfo),
             keyClass,
             valueClass,
             1,
@@ -373,7 +386,7 @@ public class RemoteMergeShuffleWithRssClientTestWhenShuffleFlushed extends Shuff
             layout,
             0,
             PARTITION_ID,
-            Lists.newArrayList(shuffleServerInfo1),
+            Lists.newArrayList(shuffleServerInfo),
             keyClass,
             valueClass,
             2,
@@ -389,7 +402,7 @@ public class RemoteMergeShuffleWithRssClientTestWhenShuffleFlushed extends Shuff
             layout,
             1,
             PARTITION_ID,
-            Lists.newArrayList(shuffleServerInfo1),
+            Lists.newArrayList(shuffleServerInfo),
             keyClass,
             valueClass,
             0,
@@ -402,7 +415,7 @@ public class RemoteMergeShuffleWithRssClientTestWhenShuffleFlushed extends Shuff
             layout,
             1,
             PARTITION_ID,
-            Lists.newArrayList(shuffleServerInfo1),
+            Lists.newArrayList(shuffleServerInfo),
             keyClass,
             valueClass,
             2,
@@ -411,7 +424,7 @@ public class RemoteMergeShuffleWithRssClientTestWhenShuffleFlushed extends Shuff
             1));
     shuffleWriteClientImpl.sendShuffleData(testAppId, blocks2, () -> false);
     Map<Integer, List<ShuffleServerInfo>> partitionToServers =
-        ImmutableMap.of(PARTITION_ID, Lists.newArrayList(shuffleServerInfo1));
+        ImmutableMap.of(PARTITION_ID, Lists.newArrayList(shuffleServerInfo));
 
     // 4 report shuffle result
     Map<Integer, Set<Long>> ptb = ImmutableMap.of(PARTITION_ID, new HashSet());
@@ -420,7 +433,7 @@ public class RemoteMergeShuffleWithRssClientTestWhenShuffleFlushed extends Shuff
     ptb.get(PARTITION_ID)
         .addAll(blocks2.stream().map(s -> s.getBlockId()).collect(Collectors.toList()));
     Map<ShuffleServerInfo, Map<Integer, Set<Long>>> serverToPartitionToBlockIds = new HashMap();
-    serverToPartitionToBlockIds.put(shuffleServerInfo1, ptb);
+    serverToPartitionToBlockIds.put(shuffleServerInfo, ptb);
     shuffleWriteClientImpl.reportShuffleResult(
         serverToPartitionToBlockIds, testAppId, SHUFFLE_ID, 0, 1);
     shuffleWriteClientImpl.reportShuffleResult(
@@ -430,11 +443,11 @@ public class RemoteMergeShuffleWithRssClientTestWhenShuffleFlushed extends Shuff
     Roaring64NavigableMap uniqueBlockIds = Roaring64NavigableMap.bitmapOf();
     ptb.get(PARTITION_ID).stream().forEach(block -> uniqueBlockIds.add(block));
     shuffleWriteClientImpl.reportUniqueBlocks(
-        Sets.newHashSet(shuffleServerInfo1), testAppId, SHUFFLE_ID, PARTITION_ID, uniqueBlockIds);
+        Sets.newHashSet(shuffleServerInfo), testAppId, SHUFFLE_ID, PARTITION_ID, uniqueBlockIds);
 
     // 6 read result
     Map<Integer, List<ShuffleServerInfo>> serverInfoMap =
-        ImmutableMap.of(PARTITION_ID, Lists.newArrayList(shuffleServerInfo1));
+        ImmutableMap.of(PARTITION_ID, Lists.newArrayList(shuffleServerInfo));
     RMRecordsReader reader =
         new RMRecordsReader(
             testAppId,
@@ -493,7 +506,7 @@ public class RemoteMergeShuffleWithRssClientTestWhenShuffleFlushed extends Shuff
     // 2 register shuffle
     String testAppId = "remoteMergeWriteReadTestMultiPartition" + classes;
     shuffleWriteClientImpl.registerShuffle(
-        shuffleServerInfo1,
+        shuffleServerInfo,
         testAppId,
         SHUFFLE_ID,
         Lists.newArrayList(
@@ -521,7 +534,7 @@ public class RemoteMergeShuffleWithRssClientTestWhenShuffleFlushed extends Shuff
             layout,
             0,
             0,
-            Lists.newArrayList(shuffleServerInfo1),
+            Lists.newArrayList(shuffleServerInfo),
             keyClass,
             valueClass,
             0,
@@ -534,7 +547,7 @@ public class RemoteMergeShuffleWithRssClientTestWhenShuffleFlushed extends Shuff
             layout,
             0,
             2,
-            Lists.newArrayList(shuffleServerInfo1),
+            Lists.newArrayList(shuffleServerInfo),
             keyClass,
             valueClass,
             2,
@@ -547,7 +560,7 @@ public class RemoteMergeShuffleWithRssClientTestWhenShuffleFlushed extends Shuff
             layout,
             0,
             1,
-            Lists.newArrayList(shuffleServerInfo1),
+            Lists.newArrayList(shuffleServerInfo),
             keyClass,
             valueClass,
             4,
@@ -563,7 +576,7 @@ public class RemoteMergeShuffleWithRssClientTestWhenShuffleFlushed extends Shuff
             layout,
             1,
             1,
-            Lists.newArrayList(shuffleServerInfo1),
+            Lists.newArrayList(shuffleServerInfo),
             keyClass,
             valueClass,
             1,
@@ -576,7 +589,7 @@ public class RemoteMergeShuffleWithRssClientTestWhenShuffleFlushed extends Shuff
             layout,
             1,
             0,
-            Lists.newArrayList(shuffleServerInfo1),
+            Lists.newArrayList(shuffleServerInfo),
             keyClass,
             valueClass,
             3,
@@ -589,7 +602,7 @@ public class RemoteMergeShuffleWithRssClientTestWhenShuffleFlushed extends Shuff
             layout,
             1,
             2,
-            Lists.newArrayList(shuffleServerInfo1),
+            Lists.newArrayList(shuffleServerInfo),
             keyClass,
             valueClass,
             5,
@@ -600,11 +613,11 @@ public class RemoteMergeShuffleWithRssClientTestWhenShuffleFlushed extends Shuff
     Map<Integer, List<ShuffleServerInfo>> partitionToServers =
         ImmutableMap.of(
             PARTITION_ID,
-            Lists.newArrayList(shuffleServerInfo1),
+            Lists.newArrayList(shuffleServerInfo),
             PARTITION_ID + 1,
-            Lists.newArrayList(shuffleServerInfo1),
+            Lists.newArrayList(shuffleServerInfo),
             PARTITION_ID + 2,
-            Lists.newArrayList(shuffleServerInfo1));
+            Lists.newArrayList(shuffleServerInfo));
 
     // 4 report shuffle result
     Map<Integer, Set<Long>> ptb = new HashMap<>();
@@ -625,7 +638,7 @@ public class RemoteMergeShuffleWithRssClientTestWhenShuffleFlushed extends Shuff
                   .collect(Collectors.toList()));
     }
     Map<ShuffleServerInfo, Map<Integer, Set<Long>>> serverToPartitionToBlockIds = new HashMap();
-    serverToPartitionToBlockIds.put(shuffleServerInfo1, ptb);
+    serverToPartitionToBlockIds.put(shuffleServerInfo, ptb);
     shuffleWriteClientImpl.reportShuffleResult(
         serverToPartitionToBlockIds, testAppId, SHUFFLE_ID, 0, 1);
     shuffleWriteClientImpl.reportShuffleResult(
@@ -636,18 +649,18 @@ public class RemoteMergeShuffleWithRssClientTestWhenShuffleFlushed extends Shuff
       Roaring64NavigableMap uniqueBlockIds = Roaring64NavigableMap.bitmapOf();
       ptb.get(i).stream().forEach(block -> uniqueBlockIds.add(block));
       shuffleWriteClientImpl.reportUniqueBlocks(
-          Sets.newHashSet(shuffleServerInfo1), testAppId, SHUFFLE_ID, i, uniqueBlockIds);
+          Sets.newHashSet(shuffleServerInfo), testAppId, SHUFFLE_ID, i, uniqueBlockIds);
     }
 
     // 6 read result
     Map<Integer, List<ShuffleServerInfo>> serverInfoMap =
         ImmutableMap.of(
             PARTITION_ID,
-            Lists.newArrayList(shuffleServerInfo1),
+            Lists.newArrayList(shuffleServerInfo),
             PARTITION_ID + 1,
-            Lists.newArrayList(shuffleServerInfo1),
+            Lists.newArrayList(shuffleServerInfo),
             PARTITION_ID + 2,
-            Lists.newArrayList(shuffleServerInfo1));
+            Lists.newArrayList(shuffleServerInfo));
     RMRecordsReader reader =
         new RMRecordsReader(
             testAppId,
@@ -701,7 +714,7 @@ public class RemoteMergeShuffleWithRssClientTestWhenShuffleFlushed extends Shuff
     // 2 register shuffle
     String testAppId = "remoteMergeWriteReadTestMultiPartitionWithCombine" + classes;
     shuffleWriteClientImpl.registerShuffle(
-        shuffleServerInfo1,
+        shuffleServerInfo,
         testAppId,
         SHUFFLE_ID,
         Lists.newArrayList(
@@ -730,7 +743,7 @@ public class RemoteMergeShuffleWithRssClientTestWhenShuffleFlushed extends Shuff
             layout,
             0,
             0,
-            Lists.newArrayList(shuffleServerInfo1),
+            Lists.newArrayList(shuffleServerInfo),
             keyClass,
             valueClass,
             0,
@@ -743,7 +756,7 @@ public class RemoteMergeShuffleWithRssClientTestWhenShuffleFlushed extends Shuff
             layout,
             0,
             2,
-            Lists.newArrayList(shuffleServerInfo1),
+            Lists.newArrayList(shuffleServerInfo),
             keyClass,
             valueClass,
             2,
@@ -756,7 +769,7 @@ public class RemoteMergeShuffleWithRssClientTestWhenShuffleFlushed extends Shuff
             layout,
             0,
             1,
-            Lists.newArrayList(shuffleServerInfo1),
+            Lists.newArrayList(shuffleServerInfo),
             keyClass,
             valueClass,
             4,
@@ -772,7 +785,7 @@ public class RemoteMergeShuffleWithRssClientTestWhenShuffleFlushed extends Shuff
             layout,
             1,
             1,
-            Lists.newArrayList(shuffleServerInfo1),
+            Lists.newArrayList(shuffleServerInfo),
             keyClass,
             valueClass,
             1,
@@ -785,7 +798,7 @@ public class RemoteMergeShuffleWithRssClientTestWhenShuffleFlushed extends Shuff
             layout,
             1,
             0,
-            Lists.newArrayList(shuffleServerInfo1),
+            Lists.newArrayList(shuffleServerInfo),
             keyClass,
             valueClass,
             3,
@@ -798,7 +811,7 @@ public class RemoteMergeShuffleWithRssClientTestWhenShuffleFlushed extends Shuff
             layout,
             1,
             2,
-            Lists.newArrayList(shuffleServerInfo1),
+            Lists.newArrayList(shuffleServerInfo),
             keyClass,
             valueClass,
             5,
@@ -809,11 +822,11 @@ public class RemoteMergeShuffleWithRssClientTestWhenShuffleFlushed extends Shuff
     Map<Integer, List<ShuffleServerInfo>> partitionToServers =
         ImmutableMap.of(
             PARTITION_ID,
-            Lists.newArrayList(shuffleServerInfo1),
+            Lists.newArrayList(shuffleServerInfo),
             PARTITION_ID + 1,
-            Lists.newArrayList(shuffleServerInfo1),
+            Lists.newArrayList(shuffleServerInfo),
             PARTITION_ID + 2,
-            Lists.newArrayList(shuffleServerInfo1));
+            Lists.newArrayList(shuffleServerInfo));
 
     // 4 report shuffle result
     Map<Integer, Set<Long>> ptb = new HashMap<>();
@@ -834,7 +847,7 @@ public class RemoteMergeShuffleWithRssClientTestWhenShuffleFlushed extends Shuff
                   .collect(Collectors.toList()));
     }
     Map<ShuffleServerInfo, Map<Integer, Set<Long>>> serverToPartitionToBlockIds = new HashMap();
-    serverToPartitionToBlockIds.put(shuffleServerInfo1, ptb);
+    serverToPartitionToBlockIds.put(shuffleServerInfo, ptb);
     shuffleWriteClientImpl.reportShuffleResult(
         serverToPartitionToBlockIds, testAppId, SHUFFLE_ID, 0, 1);
     shuffleWriteClientImpl.reportShuffleResult(
@@ -852,11 +865,11 @@ public class RemoteMergeShuffleWithRssClientTestWhenShuffleFlushed extends Shuff
     Map<Integer, List<ShuffleServerInfo>> serverInfoMap =
         ImmutableMap.of(
             PARTITION_ID,
-            Lists.newArrayList(shuffleServerInfo1),
+            Lists.newArrayList(shuffleServerInfo),
             PARTITION_ID + 1,
-            Lists.newArrayList(shuffleServerInfo1),
+            Lists.newArrayList(shuffleServerInfo),
             PARTITION_ID + 2,
-            Lists.newArrayList(shuffleServerInfo1));
+            Lists.newArrayList(shuffleServerInfo));
     RMRecordsReader reader =
         new RMRecordsReader(
             testAppId,
