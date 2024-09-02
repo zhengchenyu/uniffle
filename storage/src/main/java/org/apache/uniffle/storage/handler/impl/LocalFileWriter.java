@@ -23,27 +23,44 @@ import java.io.DataOutputStream;
 import java.io.File;
 import java.io.FileOutputStream;
 import java.io.IOException;
+import java.nio.ByteBuffer;
+import java.nio.channels.FileChannel;
 
 import org.apache.uniffle.storage.api.FileWriter;
 import org.apache.uniffle.storage.common.FileBasedShuffleSegment;
 
 public class LocalFileWriter implements FileWriter, Closeable {
 
-  private DataOutputStream dataOutputStream;
   private FileOutputStream fileOutputStream;
   private long nextOffset;
 
+  private FileChannel fileChannel;
+  private DataOutputStream dataOutputStream;
+
   public LocalFileWriter(File file) throws IOException {
     fileOutputStream = new FileOutputStream(file, true);
-    // init fsDataOutputStream
-    dataOutputStream = new DataOutputStream(new BufferedOutputStream(fileOutputStream));
     nextOffset = file.length();
+    // When using outputStream to write data, DirectByteBuffer must be converted
+    // to byte[] in the heap, which causes unnecessary data copying. Therefore,
+    // FileChannel is used to write DirectByteBuffer here.
+    fileChannel = fileOutputStream.getChannel();
+    assert fileChannel.position() == nextOffset;
+    // For index, the data is already in the heap, so use dataOutputStream
+    dataOutputStream = new DataOutputStream(new BufferedOutputStream(fileOutputStream));
   }
 
   public void writeData(byte[] data) throws IOException {
     if (data != null && data.length > 0) {
       dataOutputStream.write(data);
       nextOffset = nextOffset + data.length;
+    }
+  }
+
+  public void writeData(ByteBuffer data) throws IOException {
+    if (data != null && data.remaining() > 0) {
+      int len = data.remaining();
+      fileChannel.write(data);
+      nextOffset += len;
     }
   }
 

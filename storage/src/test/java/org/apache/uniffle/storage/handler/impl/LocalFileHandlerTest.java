@@ -19,6 +19,7 @@ package org.apache.uniffle.storage.handler.impl;
 
 import java.io.File;
 import java.io.IOException;
+import java.nio.ByteBuffer;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
@@ -32,6 +33,8 @@ import org.apache.uniffle.common.ShuffleDataResult;
 import org.apache.uniffle.common.ShuffleIndexResult;
 import org.apache.uniffle.common.config.RssBaseConf;
 import org.apache.uniffle.storage.util.ShuffleStorageUtils;
+import org.junit.jupiter.params.ParameterizedTest;
+import org.junit.jupiter.params.provider.ValueSource;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
@@ -39,8 +42,9 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
 
 public class LocalFileHandlerTest {
 
-  @Test
-  public void writeTest(@TempDir File tmpDir) throws Exception {
+  @ParameterizedTest
+  @ValueSource(booleans = {true, false})
+  public void writeTest(boolean direct, @TempDir File tmpDir) throws Exception {
     File dataDir1 = new File(tmpDir, "data1");
     File dataDir2 = new File(tmpDir, "data2");
     String[] basePaths = new String[] {dataDir1.getAbsolutePath(), dataDir2.getAbsolutePath()};
@@ -59,48 +63,48 @@ public class LocalFileHandlerTest {
         writeHandler1.getBasePath().endsWith(possiblePath1)
             || writeHandler1.getBasePath().endsWith(possiblePath2));
 
-    Map<Long, byte[]> expectedData = Maps.newHashMap();
+    Map<Long, ByteBuffer> expectedData = Maps.newHashMap();
     final Set<Long> expectedBlockIds1 = Sets.newHashSet();
     final Set<Long> expectedBlockIds2 = Sets.newHashSet();
 
     LocalFileHandlerTestBase.writeTestData(
-        LocalFileHandlerTestBase.generateBlocks(1, 32),
+        LocalFileHandlerTestBase.generateBlocks(1, 32, direct),
         writeHandler1,
         expectedData,
         expectedBlockIds1);
     LocalFileHandlerTestBase.writeTestData(
-        LocalFileHandlerTestBase.generateBlocks(2, 32),
+        LocalFileHandlerTestBase.generateBlocks(2, 32, direct),
         writeHandler1,
         expectedData,
         expectedBlockIds1);
     LocalFileHandlerTestBase.writeTestData(
-        LocalFileHandlerTestBase.generateBlocks(3, 32),
+        LocalFileHandlerTestBase.generateBlocks(3, 32, direct),
         writeHandler1,
         expectedData,
         expectedBlockIds1);
     LocalFileHandlerTestBase.writeTestData(
-        LocalFileHandlerTestBase.generateBlocks(4, 32),
+        LocalFileHandlerTestBase.generateBlocks(4, 32, direct),
         writeHandler1,
         expectedData,
         expectedBlockIds1);
 
     LocalFileHandlerTestBase.writeTestData(
-        LocalFileHandlerTestBase.generateBlocks(3, 32),
+        LocalFileHandlerTestBase.generateBlocks(3, 32, direct),
         writeHandler2,
         expectedData,
         expectedBlockIds2);
     LocalFileHandlerTestBase.writeTestData(
-        LocalFileHandlerTestBase.generateBlocks(3, 32),
+        LocalFileHandlerTestBase.generateBlocks(3, 32, direct),
         writeHandler2,
         expectedData,
         expectedBlockIds2);
     LocalFileHandlerTestBase.writeTestData(
-        LocalFileHandlerTestBase.generateBlocks(2, 32),
+        LocalFileHandlerTestBase.generateBlocks(2, 32, direct),
         writeHandler2,
         expectedData,
         expectedBlockIds2);
     LocalFileHandlerTestBase.writeTestData(
-        LocalFileHandlerTestBase.generateBlocks(1, 32),
+        LocalFileHandlerTestBase.generateBlocks(1, 32, direct),
         writeHandler2,
         expectedData,
         expectedBlockIds2);
@@ -118,7 +122,7 @@ public class LocalFileHandlerTest {
 
     // after first read, write more data
     LocalFileHandlerTestBase.writeTestData(
-        LocalFileHandlerTestBase.generateBlocks(1, 32),
+        LocalFileHandlerTestBase.generateBlocks(1, 32, direct),
         writeHandler1,
         expectedData,
         expectedBlockIds1);
@@ -140,17 +144,29 @@ public class LocalFileHandlerTest {
     }
   }
 
-  @Test
-  public void writeBigDataTest(@TempDir File tmpDir) throws IOException {
+  @ParameterizedTest
+  @ValueSource(booleans = {true, false})
+  public void writeBigDataTest(boolean direct, @TempDir File tmpDir) throws IOException {
+    // 1 write new file
     File writeFile = new File(tmpDir, "writetest");
     LocalFileWriter writer = new LocalFileWriter(writeFile);
     int size = Integer.MAX_VALUE / 100;
-    byte[] data = new byte[size];
+    ByteBuffer byteBuffer = direct ? ByteBuffer.allocateDirect(size) : ByteBuffer.allocate(size);
     for (int i = 0; i < 200; i++) {
-      writer.writeData(data);
+      writer.writeData(byteBuffer);
+      assertEquals(writer.nextOffset(), size * (i + 1L));
+      byteBuffer.flip();
     }
-    long totalSize = 200L * size;
-    assertEquals(writer.nextOffset(), totalSize);
+    writer.close();
+
+    // 2 write exist file
+    writer = new LocalFileWriter(writeFile);
+    for (int i = 0; i < 200; i++) {
+      writer.writeData(byteBuffer);
+      assertEquals(writer.nextOffset(), size * (i + 201L));
+      byteBuffer.flip();
+    }
+    writer.close();
   }
 
   @Test

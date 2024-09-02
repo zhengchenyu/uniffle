@@ -17,6 +17,7 @@
 
 package org.apache.uniffle.storage.handler.impl;
 
+import io.netty.buffer.Unpooled;
 import java.nio.ByteBuffer;
 import java.util.List;
 import java.util.Map;
@@ -34,7 +35,6 @@ import org.apache.uniffle.common.ShuffleIndexResult;
 import org.apache.uniffle.common.ShufflePartitionedBlock;
 import org.apache.uniffle.common.segment.FixedSizeSegmentSplitter;
 import org.apache.uniffle.common.util.BlockIdLayout;
-import org.apache.uniffle.common.util.ByteBufUtils;
 import org.apache.uniffle.common.util.ChecksumUtils;
 import org.apache.uniffle.storage.common.FileBasedShuffleSegment;
 import org.apache.uniffle.storage.handler.api.ServerReadHandler;
@@ -46,16 +46,19 @@ import static org.junit.jupiter.api.Assertions.assertEquals;
 public class LocalFileHandlerTestBase {
   private static AtomicInteger ATOMIC_INT = new AtomicInteger(0);
 
-  public static List<ShufflePartitionedBlock> generateBlocks(int num, int length) {
+  public static List<ShufflePartitionedBlock> generateBlocks(int num, int length, boolean direct) {
     BlockIdLayout layout = BlockIdLayout.DEFAULT;
     List<ShufflePartitionedBlock> blocks = Lists.newArrayList();
     for (int i = 0; i < num; i++) {
+      ByteBuffer byteBuffer = direct ? ByteBuffer.allocateDirect(length) : ByteBuffer.allocate(length);
       byte[] buf = new byte[length];
       new Random().nextBytes(buf);
+      byteBuffer.put(buf);
+      byteBuffer.flip();
       long blockId = layout.getBlockId(ATOMIC_INT.incrementAndGet(), 0, 100);
       blocks.add(
           new ShufflePartitionedBlock(
-              length, length, ChecksumUtils.getCrc32(buf), blockId, 100, buf));
+              length, length, ChecksumUtils.getCrc32(buf), blockId, 100, Unpooled.wrappedBuffer(byteBuffer)));
     }
     return blocks;
   }
@@ -63,30 +66,38 @@ public class LocalFileHandlerTestBase {
   public static void writeTestData(
       List<ShufflePartitionedBlock> blocks,
       ShuffleWriteHandler handler,
-      Map<Long, byte[]> expectedData,
+      Map<Long, ByteBuffer> expectedData,
       Set<Long> expectedBlockIds)
       throws Exception {
     blocks.forEach(block -> block.getData().retain());
     handler.write(blocks);
     blocks.forEach(block -> expectedBlockIds.add(block.getBlockId()));
     blocks.forEach(
-        block -> expectedData.put(block.getBlockId(), ByteBufUtils.readBytes(block.getData())));
+        block -> expectedData.put(block.getBlockId(), block.getData().nioBuffer(0, block.getLength())));
     blocks.forEach(block -> block.getData().release());
   }
 
   public static void validateResult(
-      ServerReadHandler readHandler, Set<Long> expectedBlockIds, Map<Long, byte[]> expectedData) {
+      ServerReadHandler readHandler, Set<Long> expectedBlockIds, Map<Long, ByteBuffer> expectedData) {
     List<ShuffleDataResult> shuffleDataResults = readAll(readHandler);
     Set<Long> actualBlockIds = Sets.newHashSet();
     for (ShuffleDataResult sdr : shuffleDataResults) {
       byte[] buffer = sdr.getData();
       List<BufferSegment> bufferSegments = sdr.getBufferSegments();
-
       for (BufferSegment bs : bufferSegments) {
         byte[] data = new byte[bs.getLength()];
         System.arraycopy(buffer, bs.getOffset(), data, 0, bs.getLength());
         assertEquals(bs.getCrc(), ChecksumUtils.getCrc32(data));
-        assertArrayEquals(expectedData.get(bs.getBlockId()), data);
+        ByteBuffer byteBuffer = expectedData.get(bs.getBlockId());
+        byte[] expectedBytes;
+        if (byteBuffer.hasArray()) {
+          expectedBytes = byteBuffer.array();
+        } else {
+          expectedBytes = new byte[byteBuffer.remaining()];
+          byteBuffer.get(expectedBytes);
+          byteBuffer.flip();
+        }
+        assertArrayEquals(expectedBytes, data);
         actualBlockIds.add(bs.getBlockId());
       }
     }
@@ -127,7 +138,7 @@ public class LocalFileHandlerTestBase {
   }
 
   public static void checkData(
-      ShuffleDataResult shuffleDataResult, Map<Long, byte[]> expectedData) {
+      ShuffleDataResult shuffleDataResult, Map<Long, ByteBuffer> expectedData) {
     byte[] buffer = shuffleDataResult.getData();
     List<BufferSegment> bufferSegments = shuffleDataResult.getBufferSegments();
 
@@ -135,7 +146,16 @@ public class LocalFileHandlerTestBase {
       byte[] data = new byte[bs.getLength()];
       System.arraycopy(buffer, bs.getOffset(), data, 0, bs.getLength());
       assertEquals(bs.getCrc(), ChecksumUtils.getCrc32(data));
-      assertArrayEquals(expectedData.get(bs.getBlockId()), data);
+      ByteBuffer byteBuffer = expectedData.get(bs.getBlockId());
+      byte[] expectedBytes;
+      if (byteBuffer.hasArray()) {
+        expectedBytes = byteBuffer.array();
+      } else {
+        expectedBytes = new byte[byteBuffer.remaining()];
+        byteBuffer.get(expectedBytes);
+        byteBuffer.flip();
+      }
+      assertArrayEquals(expectedBytes, data);
     }
   }
 
@@ -148,27 +168,34 @@ public class LocalFileHandlerTestBase {
     byteBuffer.putLong(segment.getTaskAttemptId());
   }
 
-  public static List<byte[]> calcSegmentBytes(
-      Map<Long, byte[]> blockIdToData, int bytesPerSegment, List<Long> blockIds) {
-    List<byte[]> res = Lists.newArrayList();
+  public static List<ByteBuffer> calcSegmentBytes(
+      Map<Long, ByteBuffer> blockIdToData, int bytesPerSegment, List<Long> blockIds) {
+    List<ByteBuffer> res = Lists.newArrayList();
     int curSize = 0;
-    ByteBuffer byteBuffer = ByteBuffer.allocate(2 * bytesPerSegment);
+    ByteBuffer tmpBuffer = ByteBuffer.allocate(2 * bytesPerSegment);
+    boolean direct = false;
     for (long i : blockIds) {
-      byte[] data = blockIdToData.get(i);
-      byteBuffer.put(data, 0, data.length);
-      curSize += data.length;
+      ByteBuffer data = blockIdToData.get(i);
+      direct = data.isDirect();
+      curSize += data.remaining();
+      tmpBuffer.put(data);
+      data.flip();
       if (curSize >= bytesPerSegment) {
-        byte[] newByte = new byte[curSize];
-        System.arraycopy(byteBuffer.array(), 0, newByte, 0, curSize);
-        res.add(newByte);
-        byteBuffer.clear();
+        ByteBuffer newBuffer = direct ? ByteBuffer.allocateDirect(curSize) : ByteBuffer.allocate(curSize);
+        tmpBuffer.flip();
+        newBuffer.put(tmpBuffer);
+        newBuffer.flip();
+        res.add(newBuffer);
+        tmpBuffer.clear();
         curSize = 0;
       }
     }
     if (curSize > 0) {
-      byte[] newByte = new byte[curSize];
-      System.arraycopy(byteBuffer.array(), 0, newByte, 0, curSize);
-      res.add(newByte);
+      ByteBuffer newBuffer =  direct ? ByteBuffer.allocateDirect(curSize) : ByteBuffer.allocate(curSize);
+      tmpBuffer.flip();
+      newBuffer.put(tmpBuffer);
+      newBuffer.flip();
+      res.add(newBuffer);
     }
     return res;
   }

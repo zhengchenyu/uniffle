@@ -25,7 +25,8 @@ import java.util.stream.Collectors;
 
 import com.google.common.collect.Maps;
 import io.netty.buffer.Unpooled;
-import org.junit.jupiter.api.Test;
+import org.junit.jupiter.params.ParameterizedTest;
+import org.junit.jupiter.params.provider.ValueSource;
 import org.mockito.ArgumentMatcher;
 import org.mockito.Mockito;
 import org.roaringbitmap.longlong.Roaring64NavigableMap;
@@ -43,9 +44,11 @@ import org.apache.uniffle.storage.common.FileBasedShuffleSegment;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 
 public class LocalFileServerReadHandlerTest {
-  @Test
-  public void testDataInconsistent() throws Exception {
-    Map<Long, byte[]> expectedData = Maps.newHashMap();
+
+  @ParameterizedTest
+  @ValueSource(booleans = {true, false})
+  public void testDataInconsistent(boolean direct) throws Exception {
+    Map<Long, ByteBuffer> expectedData = Maps.newHashMap();
     int expectTotalBlockNum = 4;
     int blockSize = 7;
 
@@ -55,7 +58,7 @@ public class LocalFileServerReadHandlerTest {
     // We simulate the generation of 4 block index files and 3 block data files to test
     // LocalFileClientReadHandler
     List<ShufflePartitionedBlock> blocks =
-        LocalFileHandlerTestBase.generateBlocks(expectTotalBlockNum, blockSize);
+        LocalFileHandlerTestBase.generateBlocks(expectTotalBlockNum, blockSize, direct);
     LocalFileHandlerTestBase.writeTestData(
         blocks,
         shuffleBlocks -> {
@@ -100,7 +103,7 @@ public class LocalFileServerReadHandlerTest {
             .map(ShufflePartitionedBlock::getBlockId)
             .limit(actualWriteDataBlock)
             .collect(Collectors.toList());
-    List<byte[]> segments =
+    List<ByteBuffer> segments =
         LocalFileHandlerTestBase.calcSegmentBytes(
             expectedData, bytesPerSegment, actualWriteBlockIds);
 
@@ -111,9 +114,9 @@ public class LocalFileServerReadHandlerTest {
     ArgumentMatcher<RssGetShuffleDataRequest> segment2Match =
         (request) -> request.getOffset() == bytesPerSegment && request.getLength() == blockSize;
     RssGetShuffleDataResponse segment1Response =
-        new RssGetShuffleDataResponse(StatusCode.SUCCESS, ByteBuffer.wrap(segments.get(0)));
+        new RssGetShuffleDataResponse(StatusCode.SUCCESS, segments.get(0));
     RssGetShuffleDataResponse segment2Response =
-        new RssGetShuffleDataResponse(StatusCode.SUCCESS, ByteBuffer.wrap(segments.get(1)));
+        new RssGetShuffleDataResponse(StatusCode.SUCCESS, segments.get(1));
 
     Mockito.doReturn(segment1Response)
         .when(mockShuffleServerClient)

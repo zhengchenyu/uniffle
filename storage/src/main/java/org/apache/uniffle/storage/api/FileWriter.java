@@ -18,12 +18,15 @@
 package org.apache.uniffle.storage.api;
 
 import java.io.IOException;
+import java.nio.ByteBuffer;
 
 import org.apache.uniffle.storage.common.FileBasedShuffleSegment;
 
 public interface FileWriter {
 
   void writeData(byte[] data) throws IOException;
+
+  void writeData(ByteBuffer byteBuffer) throws IOException;
 
   void writeIndex(FileBasedShuffleSegment segment) throws IOException;
 }
