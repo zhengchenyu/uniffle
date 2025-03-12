@@ -46,6 +46,7 @@ import org.roaringbitmap.longlong.Roaring64NavigableMap;
 
 import org.apache.uniffle.client.factory.ShuffleClientFactory;
 import org.apache.uniffle.client.impl.ShuffleWriteClientImpl;
+import org.apache.uniffle.client.record.Record;
 import org.apache.uniffle.client.record.reader.KeyValueReader;
 import org.apache.uniffle.client.record.reader.RMRecordsReader;
 import org.apache.uniffle.client.record.writer.Combiner;
@@ -313,9 +314,10 @@ public class RemoteMergeShuffleWithRssClientTest extends ShuffleReadWriteBase {
     reader.start();
     int index = 0;
     KeyValueReader keyValueReader = reader.keyValueReader();
-    while (keyValueReader.next()) {
-      assertEquals(SerializerUtils.genData(keyClass, index), keyValueReader.getCurrentKey());
-      assertEquals(SerializerUtils.genData(valueClass, index), keyValueReader.getCurrentValue());
+    while (keyValueReader.hasNext()) {
+      Record record = keyValueReader.next();
+      assertEquals(SerializerUtils.genData(keyClass, index), record.getKey());
+      assertEquals(SerializerUtils.genData(valueClass, index), record.getValue());
       index++;
     }
     assertEquals(5 * RECORD_NUMBER, index);
@@ -487,8 +489,9 @@ public class RemoteMergeShuffleWithRssClientTest extends ShuffleReadWriteBase {
     reader.start();
     int index = 0;
     KeyValueReader keyValueReader = reader.keyValueReader();
-    while (keyValueReader.next()) {
-      assertEquals(SerializerUtils.genData(keyClass, index), keyValueReader.getCurrentKey());
+    while (keyValueReader.hasNext()) {
+      Record record = keyValueReader.next();
+      assertEquals(SerializerUtils.genData(keyClass, index), record.getKey());
       Object value = SerializerUtils.genData(valueClass, index);
       Object newValue = value;
       if (index % 3 != 1) {
@@ -498,7 +501,7 @@ public class RemoteMergeShuffleWithRssClientTest extends ShuffleReadWriteBase {
           newValue = (int) value * 2;
         }
       }
-      assertEquals(newValue, keyValueReader.getCurrentValue());
+      assertEquals(newValue, record.getValue());
       index++;
     }
     assertEquals(3 * RECORD_NUMBER, index);
@@ -709,9 +712,10 @@ public class RemoteMergeShuffleWithRssClientTest extends ShuffleReadWriteBase {
     reader.start();
     int index = 0;
     KeyValueReader keyValueReader = reader.keyValueReader();
-    while (keyValueReader.next()) {
-      assertEquals(SerializerUtils.genData(keyClass, index), keyValueReader.getCurrentKey());
-      assertEquals(SerializerUtils.genData(valueClass, index), keyValueReader.getCurrentValue());
+    while (keyValueReader.hasNext()) {
+      Record record = keyValueReader.next();
+      assertEquals(SerializerUtils.genData(keyClass, index), record.getKey());
+      assertEquals(SerializerUtils.genData(valueClass, index), record.getValue());
       index++;
     }
     assertEquals(6 * RECORD_NUMBER, index);
@@ -926,10 +930,10 @@ public class RemoteMergeShuffleWithRssClientTest extends ShuffleReadWriteBase {
     reader.start();
     int index = 0;
     KeyValueReader keyValueReader = reader.keyValueReader();
-    while (keyValueReader.next()) {
-      assertEquals(SerializerUtils.genData(keyClass, index), keyValueReader.getCurrentKey());
-      assertEquals(
-          SerializerUtils.genData(valueClass, index * 2), keyValueReader.getCurrentValue());
+    while (keyValueReader.hasNext()) {
+      Record record = keyValueReader.next();
+      assertEquals(SerializerUtils.genData(keyClass, index), record.getKey());
+      assertEquals(SerializerUtils.genData(valueClass, index * 2), record.getValue());
       index++;
     }
     assertEquals(6 * RECORD_NUMBER, index);
