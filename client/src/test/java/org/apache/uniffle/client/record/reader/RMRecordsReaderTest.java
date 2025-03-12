@@ -61,6 +61,8 @@ public class RMRecordsReaderTest {
       strings = {
         "org.apache.hadoop.io.Text,org.apache.hadoop.io.IntWritable,true",
         "org.apache.hadoop.io.Text,org.apache.hadoop.io.IntWritable,false",
+        "java.lang.String,java.lang.Integer",
+        "org.apache.uniffle.common.serializer.SerializerUtils$SomeClass,java.lang.Integer",
       })
   public void testNormalReadWithoutCombine(String classes) throws Exception {
     // 1 basic parameter
@@ -117,6 +119,8 @@ public class RMRecordsReaderTest {
       strings = {
         "org.apache.hadoop.io.Text,org.apache.hadoop.io.IntWritable,true",
         "org.apache.hadoop.io.Text,org.apache.hadoop.io.IntWritable,false",
+        "java.lang.String,java.lang.Integer",
+        "org.apache.uniffle.common.serializer.SerializerUtils$SomeClass,java.lang.Integer",
       })
   public void testNormalReadWithCombine(String classes) throws Exception {
     // 1 basic parameter
@@ -196,6 +200,8 @@ public class RMRecordsReaderTest {
       strings = {
         "org.apache.hadoop.io.Text,org.apache.hadoop.io.IntWritable,true",
         "org.apache.hadoop.io.Text,org.apache.hadoop.io.IntWritable,false",
+        "java.lang.String,java.lang.Integer",
+        "org.apache.uniffle.common.serializer.SerializerUtils$SomeClass,java.lang.Integer",
       })
   public void testReadMulitPartitionWithoutCombine(String classes) throws Exception {
     // 1 basic parameter
@@ -265,6 +271,8 @@ public class RMRecordsReaderTest {
       strings = {
         "org.apache.hadoop.io.Text,org.apache.hadoop.io.IntWritable,true",
         "org.apache.hadoop.io.Text,org.apache.hadoop.io.IntWritable,false",
+        "java.lang.String,java.lang.Integer",
+        "org.apache.uniffle.common.serializer.SerializerUtils$SomeClass,java.lang.Integer",
       })
   public void testReadMulitPartitionWithCombine(String classes) throws Exception {
     // 1 basic parameter

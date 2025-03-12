@@ -159,6 +159,10 @@ public class RemoteMergeShuffleWithRssClientTest extends ShuffleReadWriteBase {
         "org.apache.hadoop.io.Text,org.apache.hadoop.io.IntWritable,GRPC_NETTY,true",
         "org.apache.hadoop.io.Text,org.apache.hadoop.io.IntWritable,GRPC,false",
         "org.apache.hadoop.io.Text,org.apache.hadoop.io.IntWritable,GRPC_NETTY,false",
+        "java.lang.String,java.lang.Integer,GRPC",
+        "java.lang.String,java.lang.Integer,GRPC_NETTY",
+        "org.apache.uniffle.common.serializer.SerializerUtils$SomeClass,java.lang.Integer,GRPC",
+        "org.apache.uniffle.common.serializer.SerializerUtils$SomeClass,java.lang.Integer,GRPC_NETTY",
       })
   @Timeout(10)
   public void remoteMergeWriteReadTest(String classes) throws Exception {
@@ -325,6 +329,10 @@ public class RemoteMergeShuffleWithRssClientTest extends ShuffleReadWriteBase {
         "org.apache.hadoop.io.Text,org.apache.hadoop.io.IntWritable,GRPC_NETTY,true",
         "org.apache.hadoop.io.Text,org.apache.hadoop.io.IntWritable,GRPC,false",
         "org.apache.hadoop.io.Text,org.apache.hadoop.io.IntWritable,GRPC_NETTY,false",
+        "java.lang.String,java.lang.Integer,GRPC",
+        "java.lang.String,java.lang.Integer,GRPC_NETTY",
+        "org.apache.uniffle.common.serializer.SerializerUtils$SomeClass,java.lang.Integer,GRPC",
+        "org.apache.uniffle.common.serializer.SerializerUtils$SomeClass,java.lang.Integer,GRPC_NETTY",
       })
   @Timeout(10)
   public void remoteMergeWriteReadTestWithCombine(String classes) throws Exception {
@@ -504,6 +512,10 @@ public class RemoteMergeShuffleWithRssClientTest extends ShuffleReadWriteBase {
         "org.apache.hadoop.io.Text,org.apache.hadoop.io.IntWritable,GRPC_NETTY,true",
         "org.apache.hadoop.io.Text,org.apache.hadoop.io.IntWritable,GRPC,false",
         "org.apache.hadoop.io.Text,org.apache.hadoop.io.IntWritable,GRPC_NETTY,false",
+        "java.lang.String,java.lang.Integer,GRPC",
+        "java.lang.String,java.lang.Integer,GRPC_NETTY",
+        "org.apache.uniffle.common.serializer.SerializerUtils$SomeClass,java.lang.Integer,GRPC",
+        "org.apache.uniffle.common.serializer.SerializerUtils$SomeClass,java.lang.Integer,GRPC_NETTY",
       })
   @Timeout(10)
   public void remoteMergeWriteReadTestMultiPartition(String classes) throws Exception {
@@ -713,6 +725,10 @@ public class RemoteMergeShuffleWithRssClientTest extends ShuffleReadWriteBase {
         "org.apache.hadoop.io.Text,org.apache.hadoop.io.IntWritable,GRPC_NETTY,true",
         "org.apache.hadoop.io.Text,org.apache.hadoop.io.IntWritable,GRPC,false",
         "org.apache.hadoop.io.Text,org.apache.hadoop.io.IntWritable,GRPC_NETTY,false",
+        "java.lang.String,java.lang.Integer,GRPC",
+        "java.lang.String,java.lang.Integer,GRPC_NETTY",
+        "org.apache.uniffle.common.serializer.SerializerUtils$SomeClass,java.lang.Integer,GRPC",
+        "org.apache.uniffle.common.serializer.SerializerUtils$SomeClass,java.lang.Integer,GRPC_NETTY",
       })
   @Timeout(10)
   public void remoteMergeWriteReadTestMultiPartitionWithCombine(String classes) throws Exception {
