@@ -487,7 +487,12 @@ public class WriteBufferManagerTest {
           List<AddBlockEvent> events = wbm.buildBlockEvents(blocks);
           for (AddBlockEvent event : events) {
             event.getProcessedCallbackChain().stream().forEach(x -> x.run());
-            sum += event.getShuffleDataInfoList().stream().mapToLong(x -> x.getFreeMemory()).sum();
+            // simulate: the block for partition 2 send failed
+            sum +=
+                event.getShuffleDataInfoList().stream()
+                    .filter(x -> x.getPartitionId() <= 1)
+                    .mapToLong(x -> x.getFreeMemory())
+                    .sum();
           }
           return Arrays.asList(CompletableFuture.completedFuture(sum));
         };
@@ -502,10 +507,11 @@ public class WriteBufferManagerTest {
     wbm.addRecord(1, testKey, testValue);
     wbm.addRecord(1, testKey, testValue);
     wbm.addRecord(1, testKey, testValue);
+    wbm.addRecord(2, testKey, testValue);
 
     long releasedSize = wbm.spill(1000, wbm);
     assertEquals(64, releasedSize);
-    assertEquals(96, wbm.getUsedBytes());
+    assertEquals(128, wbm.getUsedBytes());
     assertEquals(0, wbm.getBuffers().keySet().toArray()[0]);
   }
 
