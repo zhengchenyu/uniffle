@@ -575,7 +575,7 @@ public class ShuffleServer {
   }
 
   public int getNettyPort() {
-    return nettyPort;
+    return nettyServerEnabled ? nettyPort : -1;
   }
 
   public int getJettyPort() {
